@@ -6,7 +6,7 @@
 //
 
 import XCTest
-@testable import Basic
+import Basic
 
 class AmountTests: XCTestCase {
 

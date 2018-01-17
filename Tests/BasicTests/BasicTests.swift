@@ -43,6 +43,32 @@ class UInt256Tests: XCTestCase {
         XCTAssertEqual(a.unitFormat(unitDigitNum: 2, fractionDigitNum: 1), "100.0")
     }
 
+    func testBigUIntData1() throws {
+        var a = Data.init(hexString: "01 00 00 00 00")
+        a.reverse()
+        let b = BigUInt.init(a)
+        
+        XCTAssertEqual(b, BigUInt(1))
+    }
+    
+    func testBigUIntData2() throws {
+        let a = BigUInt.init(0x03_00000000)
+    
+        XCTAssertEqual(a.bitWidth, 34)
+    }
+    
+    func testBigUIntData3() throws {
+        let a = BigUInt.init(0x01_02030405)
+        let b = a.serialize()
+        
+        XCTAssertEqual(b.count, 5)
+        XCTAssertEqual(b[0], 1)
+        XCTAssertEqual(b[1], 2)
+        XCTAssertEqual(b[2], 3)
+        XCTAssertEqual(b[3], 4)
+        XCTAssertEqual(b[4], 5)
+    }
+    
     static var allTests = [
         ("testHex1", testHex1),
         ("testHex2", testHex2),

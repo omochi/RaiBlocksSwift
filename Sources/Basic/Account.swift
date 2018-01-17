@@ -1,11 +1,12 @@
 import Foundation
+import BigInt
 
 public class Account : CustomStringConvertible {
     public struct Address {
         public init(data: Data) {
-            precondition(data.count == 32)
+            precondition(data.count == 32, "data must be 32 bytes")
             
-            _data = data
+            self._data = data
         }
         
         public func asData() -> Data {

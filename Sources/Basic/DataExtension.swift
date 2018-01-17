@@ -1,21 +1,26 @@
 import Foundation
+import BigInt
 
 extension Data {
-    internal func toHex() -> String {
+    public func toHex() -> String {
         var ret = String.init()
         for byte in self {
             ret.append(String.init(format: "%02x", byte))
         }
         return ret
     }
+    
+    public func asBigUInt() -> BigUInt {
+        return BigUInt.init(self)
+    }
 }
 
-internal class DataHexParser {
-    init() {
+internal struct DataHexParser {
+    public init() {
         regex = try! NSRegularExpression.init(pattern: "[0-9a-fA-F]{2}", options: [])
     }
     
-    func parse(hexString string: String) -> Data {
+    public func parse(hexString string: String) -> Data {
         var ret = Data.init()
         
         let nsString = string as NSString
@@ -29,14 +34,14 @@ internal class DataHexParser {
         
         return ret
     }
-    
-    let regex: NSRegularExpression
-    
-    static let shared: DataHexParser = .init()
+
+    public static let shared: DataHexParser = .init()
+
+    private let regex: NSRegularExpression
 }
 
 extension Data {
-    internal init(hexString: String) {
+    public init(hexString: String) {
         self = DataHexParser.shared.parse(hexString: hexString)
     }
 }

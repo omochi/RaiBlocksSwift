@@ -1,6 +1,11 @@
+import Foundation
 import BigInt
 
 extension BigUInt {
+    public func asData() -> Data {
+        return serialize()
+    }
+    
     public func unitFormat(unitDigitNum: Int, fractionDigitNum: Int) -> String {
         precondition(unitDigitNum >= 0)
         precondition(fractionDigitNum >= 0)
