@@ -12,7 +12,8 @@ let package = Package(
          .package(url: "https://github.com/attaswift/BigInt.git", from: "3.0.2"),
     ],
     targets: [
-        .target(name: "Basic", dependencies: ["BigInt"]),
+        .target(name: "libb2"),
+        .target(name: "Basic", dependencies: ["BigInt", "libb2"]),
         .target(name: "RaiBlocksSwift", dependencies: ["Basic"]),
         .testTarget(name: "BasicTests", dependencies: ["Basic"]),
         .testTarget(name: "RaiBlocksSwiftTests", dependencies: ["RaiBlocksSwift"]),
