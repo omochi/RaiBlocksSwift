@@ -2,6 +2,7 @@ import XCTest
 @testable import Basic
 
 import Foundation
+import BigInt
 
 class UInt256Tests: XCTestCase {
     func testHex1() throws {
@@ -29,9 +30,23 @@ class UInt256Tests: XCTestCase {
         
         XCTAssertEqual(a.map { $0 }, b)
     }
+    
+    func testBigUIntFormat1() throws {
+        let a = BigUInt(12340567)
+        
+        XCTAssertEqual(a.unitFormat(unitDigitNum: 4, fractionDigitNum: 2), "1234.06")
+    }
+    
+    func testBigUIntFormat2() throws {
+        let a = BigUInt(9999)
+        
+        XCTAssertEqual(a.unitFormat(unitDigitNum: 2, fractionDigitNum: 1), "100.0")
+    }
 
     static var allTests = [
         ("testHex1", testHex1),
         ("testHex2", testHex2),
+        ("testBigUIntFormat1", testBigUIntFormat1),
+        ("testBigUIntFormat2", testBigUIntFormat2)
     ]
 }

@@ -1,0 +1,2 @@
+public protocol Block : CustomStringConvertible {
+}

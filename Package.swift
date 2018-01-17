@@ -9,10 +9,10 @@ let package = Package(
         .library(name: "RaiBlocksSwift", targets: ["RaiBlocksSwift"]),
         ],
     dependencies: [
-        // .package(url: /* package url */, from: "1.0.0"),
+         .package(url: "https://github.com/attaswift/BigInt.git", from: "3.0.2"),
     ],
     targets: [
-        .target(name: "Basic", dependencies: []),
+        .target(name: "Basic", dependencies: ["BigInt"]),
         .target(name: "RaiBlocksSwift", dependencies: ["Basic"]),
         .testTarget(name: "BasicTests", dependencies: ["Basic"]),
         .testTarget(name: "RaiBlocksSwiftTests", dependencies: ["RaiBlocksSwift"]),
