@@ -11,6 +11,15 @@
         }
       },
       {
+        "package": "Blake2",
+        "repositoryURL": "https://github.com/omochi/Blake2-SwiftPM.git",
+        "state": {
+          "branch": null,
+          "revision": "4bb85a42497aae3a1c88a18ee26c83d65b967eab",
+          "version": "1.0.0"
+        }
+      },
+      {
         "package": "SipHash",
         "repositoryURL": "https://github.com/attaswift/SipHash",
         "state": {
