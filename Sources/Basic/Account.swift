@@ -4,7 +4,7 @@ import BigInt
 public class Account : CustomStringConvertible {
     public struct Address {
         public init(data: Data) {
-            precondition(data.count == 32, "data must be 32 bytes")
+            precondition(data.count == Address.size, "data must be \(Address.size) bytes")
             
             self._data = data
         }
@@ -12,6 +12,8 @@ public class Account : CustomStringConvertible {
         public func asData() -> Data {
             return _data
         }
+        
+        public static let size: Int = 32
         
         private let _data: Data
     }

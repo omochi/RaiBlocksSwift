@@ -2,20 +2,20 @@ public struct SendBlock {
     public let previous: Block.Hash
     public let destination: Account.Address
     public let balance: Amount
-    public let work: Work
-    public let signature: Signature
-    
+    public var signature: Signature
+    public var work: Work
+
     public init(previous: Block.Hash,
                 destination: Account.Address,
                 balance: Amount,
-                work: Work,
-                signature: Signature)
+                signature: Signature = .zero,
+                work: Work = .init(0))
     {
         self.previous = previous
         self.destination = destination
         self.balance = balance
-        self.work = work
         self.signature = signature
+        self.work = work
     }
 }
 
@@ -25,6 +25,7 @@ extension SendBlock : CustomStringConvertible {
             "previous=\(previous)",
             "destination=\(destination)",
             "balance=\(balance)",
+            "signature=\(signature)",
             "work=\(work)"]
         return "SendBlock(\(fields.joined(separator: ", ")))"
     }
@@ -41,3 +42,18 @@ extension SendBlock {
         return Block.Hash.init(data: blake.finalize())
     }
 }
+
+extension SendBlock {
+    public mutating func sign(secretKey: SecretKey,
+                              address: Account.Address)
+    {
+        let message = hash.asData()
+        self.signature = secretKey.sign(message: message, address: address)
+    }
+    
+    public func verifySignature(address: Account.Address) -> Bool {
+        let message = hash.asData()
+        return address.verifySignature(message: message, signature: signature)
+    }
+}
+

@@ -1,19 +1,31 @@
 import Foundation
 
-public struct Signature : CustomStringConvertible {
+public struct Signature {
     public init(data: Data) {
-        precondition(data.count == 64)
+        precondition(data.count == Signature.size)
         
         self._data = data
     }
-    
-    public var description: String {
-        return asData().toHex()
-    }
-    
+
     public func asData() -> Data {
         return _data
     }
     
+    public static let size: Int = 64
+    
+    public static let zero: Signature = .init(data: Data.init(count: size))
+    
     private let _data: Data
+}
+
+extension Signature : CustomStringConvertible {
+    public var description: String {
+        return asData().toHex()
+    }
+}
+
+extension Signature {
+    public init(hexString: String) {
+        self.init(data: Data.init(hexString: hexString))
+    }
 }

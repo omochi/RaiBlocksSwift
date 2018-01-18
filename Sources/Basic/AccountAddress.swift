@@ -1,5 +1,6 @@
 import Foundation
 import BigInt
+import ED25519Donna
 
 extension Account.Address {
     public func asBigUInt() -> BigUInt {
@@ -131,7 +132,18 @@ extension Account.Address {
 }
 
 extension Account.Address {
-    public func asPublicKey() -> ED25519.PublicKey {
-        return ED25519.PublicKey.init(data: asData())
+    public func verifySignature(message: Data, signature: Signature) -> Bool {
+        let pubData = asData()
+        let sigData = signature.asData()
+        
+        let valid = message.withUnsafeBytes { msg in
+            pubData.withUnsafeBytes { pub in
+                sigData.withUnsafeBytes { sig in
+                    ed25519_sign_open(msg, message.count, pub, sig) == 0
+                }
+            }
+        }
+        
+        return valid
     }
 }
