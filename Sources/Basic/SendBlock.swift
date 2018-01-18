@@ -34,7 +34,7 @@ import Foundation
 
 extension SendBlock {
     public var hash: Block.Hash {
-        var blake = Blake2B.init(outputSize: 32)
+        let blake = Blake2B.init(outputSize: 32)
         blake.update(data: previous.asData())
         blake.update(data: destination.asData())
         blake.update(data: balance.asData())

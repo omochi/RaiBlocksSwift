@@ -1,0 +1,4 @@
+module BLAKE2 {
+	header "blake2.h"
+	export *
+}

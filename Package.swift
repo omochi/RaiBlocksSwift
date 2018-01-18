@@ -9,11 +9,14 @@ let package = Package(
         .library(name: "RaiBlocksSwift", targets: ["RaiBlocksSwift"]),
         ],
     dependencies: [
-        .package(url: "https://github.com/omochi/Blake2-SwiftPM.git", from: "1.0.0"),
         .package(url: "https://github.com/attaswift/BigInt.git", from: "3.0.2"),
         ],
     targets: [
-        .target(name: "Basic", dependencies: ["BigInt", "Blake2"]),
+        .target(name: "CRandom", dependencies: []),
+        .target(name: "BLAKE2", dependencies: []),
+        .target(name: "ED25519Donna", dependencies: ["BLAKE2", "CRandom"]),
+        .target(name: "Basic", dependencies: [
+            "CRandom", "BLAKE2", "ED25519Donna", "BigInt"]),
         .target(name: "RaiBlocksSwift", dependencies: ["Basic"]),
         .testTarget(name: "BasicTests", dependencies: ["Basic"]),
         .testTarget(name: "RaiBlocksSwiftTests", dependencies: ["RaiBlocksSwift"]),

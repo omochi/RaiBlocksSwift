@@ -1,5 +1,4 @@
 import Foundation
-import Blake2
 import BigInt
 
 extension Account.Address {
@@ -128,5 +127,11 @@ internal struct AccountAddressParser {
 extension Account.Address {
     public init(string: String) throws {
         self = try AccountAddressParser.shared.parse(string: string)
+    }
+}
+
+extension Account.Address {
+    public func asPublicKey() -> ED25519.PublicKey {
+        return ED25519.PublicKey.init(data: asData())
     }
 }

@@ -1,0 +1,4 @@
+module ED25519Donna {
+	header "ed25519.h"
+	export *
+}
