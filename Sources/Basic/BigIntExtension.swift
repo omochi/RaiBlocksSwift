@@ -2,8 +2,13 @@ import Foundation
 import BigInt
 
 extension BigUInt {
-    public func asData() -> Data {
-        return serialize()
+    public func asData(size: Int) -> Data {
+        var data = serialize()
+        precondition(data.count <= size, "value is too large")
+        if data.count < size {
+            data.insert(contentsOf: Data.init(count: size - data.count), at: 0)
+        }
+        return data
     }
     
     public func unitFormat(unitDigitNum: Int, fractionDigitNum: Int) -> String {

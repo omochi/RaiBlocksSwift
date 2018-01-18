@@ -25,5 +25,11 @@ public struct Blake2B {
         return ret
     }
     
+    public static func compute(data: Data, outputSize: Int) -> Data {
+        var blake = Blake2B.init(outputSize: outputSize)
+        blake.update(data: data)
+        return blake.finalize()
+    }
+    
     private var state: blake2b_state
 }

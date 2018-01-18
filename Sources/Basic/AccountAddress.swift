@@ -9,19 +9,13 @@ extension Account.Address {
 
     public init(bigUInt: BigUInt) {
         precondition(bigUInt.bitWidth <= 256)
-        var data = bigUInt.asData()
-        if data.count < 32 {
-            data.insert(contentsOf: Data.init(count: 32 - data.count), at: 0)
-        }
-        self.init(data: data)
+        self.init(data: bigUInt.asData(size: 32))
     }
 }
 
 extension Account.Address {
     public var checkValue: BigUInt {
-        var blake = Blake2B.init(outputSize: 5)
-        blake.update(data: asData())
-        var hash = blake.finalize()
+        var hash = Blake2B.compute(data: asData(), outputSize: 5)
         hash.reverse()
         return hash.asBigUInt()
     }

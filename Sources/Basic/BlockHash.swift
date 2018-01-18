@@ -1,21 +1,20 @@
 import Foundation
 
-public struct BlockHash {
-    public init(data: Data) {
-        precondition(data.count == 32)
-        
-        self._data = data
-    }
-
-    public func asData() -> Data {
-        return _data
-    }
-    
-    private let _data: Data
-}
-
-extension BlockHash : CustomStringConvertible {
+extension Block.Hash : CustomStringConvertible {
     public var description: String {
         return asData().toHex()
     }
+}
+
+extension Block.Hash {
+    public init(hexString: String) {
+        let data = Data.init(hexString: hexString)
+        self.init(data: data)
+    }
+}
+
+extension Block.Hash : Equatable {}
+
+public func ==(a: Block.Hash, b: Block.Hash) -> Bool {
+    return a.asData() == b.asData()
 }

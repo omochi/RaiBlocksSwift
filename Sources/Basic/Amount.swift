@@ -4,24 +4,28 @@ import BigInt
 public struct Amount {
     public enum Unit {
         case xrb
-        case rai
+        case sxrb
     }
     
-    public init(value: Int) {
+    public init(_ value: Int) {
         precondition(value >= 0)
         
-        self.init(value: BigUInt(value))
+        self.init(BigUInt(value))
+    }
+    
+    public init(_ value: Int, unit: Unit) {
+        self = Amount(value) * unit
     }
         
-    public init(value: BigUInt) {
+    public init(_ value: BigUInt) {
         precondition(value.bitWidth <= 128)
         
         self._value = value
     }
     
-    public init(string: String) {
+    public init(_ string: String) {
         let value = BigUInt.init(string)!
-        self.init(value: value)
+        self.init(value)
     }
     
     public var value: BigUInt {
@@ -43,8 +47,20 @@ extension Amount : CustomStringConvertible {
     }
 }
 
+extension Amount : Equatable {}
+
+public func ==(a: Amount, b: Amount) -> Bool {
+    return a.value == b.value
+}
+
+extension Amount : Comparable {}
+
+public func <(a: Amount, b: Amount) -> Bool {
+    return a.value < b.value
+}
+
 public func +(a: Amount, b: Amount) -> Amount {
-    return Amount.init(value: a.value + b.value)
+    return Amount(a.value + b.value)
 }
 
 public func +=(a: inout Amount, b: Amount) {
@@ -52,7 +68,7 @@ public func +=(a: inout Amount, b: Amount) {
 }
 
 public func -(a: Amount, b: Amount) -> Amount {
-    return Amount.init(value: a.value - b.value)
+    return Amount(a.value - b.value)
 }
 
 public func -=(a: inout Amount, b: Amount) {
@@ -60,7 +76,7 @@ public func -=(a: inout Amount, b: Amount) {
 }
 
 public func *(a: Amount, b: Amount) -> Amount {
-    return Amount.init(value: a.value * b.value)
+    return Amount(a.value * b.value)
 }
 
 public func *=(a: inout Amount, b: Amount) {
@@ -73,4 +89,10 @@ public func *(a: Amount, b: Amount.Unit) -> Amount {
 
 public func *=(a: inout Amount, b: Amount.Unit) {
     a = a * b
+}
+
+extension Amount {
+    public func asData() -> Data {
+        return value.asData(size: 16)
+    }
 }

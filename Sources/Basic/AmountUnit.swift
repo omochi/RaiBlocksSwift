@@ -1,26 +1,39 @@
 import BigInt
 
+internal class AmountUnitInfo {
+    public let digitNum: Int
+    public let amount: Amount
+    public let string: String
+    
+    public init(digitNum: Int, string: String) {
+        self.digitNum = digitNum
+        self.amount = Amount.init(BigUInt(10).power(digitNum))
+        self.string = string
+    }
+    
+    public static let xrb = AmountUnitInfo(digitNum: 30, string: "XRB")
+    public static let sxrb = AmountUnitInfo(digitNum: 24, string: "xrb")
+}
+
 extension Amount.Unit {
-    public var digitNum: Int {
+    internal var info: AmountUnitInfo {
         switch self {
-        case .xrb: return 24
-        case .rai: return 18
+        case .xrb: return AmountUnitInfo.xrb
+        case .sxrb: return AmountUnitInfo.sxrb
         }
     }
     
+    public var digitNum: Int {
+        return info.digitNum
+    }
+    
     public var amount: Amount {
-        switch self {
-        case .xrb: return Amount(string: "1000000000000000000000000")
-        case .rai: return Amount(string: "1000000000000000000")
-        }
+        return info.amount
     }
 }
 
 extension Amount.Unit : CustomStringConvertible {
     public var description: String {
-        switch self {
-        case .xrb: return "XRB"
-        case .rai: return "Rai"
-        }
+        return info.string
     }
 }

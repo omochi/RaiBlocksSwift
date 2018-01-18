@@ -25,7 +25,7 @@ public class Account : CustomStringConvertible {
         return _address
     }
     
-    public var headBlock: BlockHash? {
+    public var headBlock: Block.Hash? {
         return _headBlock
     }
     
@@ -37,5 +37,5 @@ public class Account : CustomStringConvertible {
     }
     
     private let _address: Address
-    private var _headBlock: BlockHash?
+    private var _headBlock: Block.Hash?
 }
