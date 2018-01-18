@@ -38,7 +38,6 @@ extension SendBlock {
         blake.update(data: previous.asData())
         blake.update(data: destination.asData())
         blake.update(data: balance.asData())
-        
         return Block.Hash.init(data: blake.finalize())
     }
 }

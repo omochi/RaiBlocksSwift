@@ -4,7 +4,7 @@ import BigInt
 public struct Amount {
     public enum Unit {
         case xrb
-        case sxrb
+        case rai
     }
     
     public init(_ value: Int) {

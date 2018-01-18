@@ -12,14 +12,14 @@ internal class AmountUnitInfo {
     }
     
     public static let xrb = AmountUnitInfo(digitNum: 30, string: "XRB")
-    public static let sxrb = AmountUnitInfo(digitNum: 24, string: "xrb")
+    public static let sxrb = AmountUnitInfo(digitNum: 24, string: "rai")
 }
 
 extension Amount.Unit {
     internal var info: AmountUnitInfo {
         switch self {
         case .xrb: return AmountUnitInfo.xrb
-        case .sxrb: return AmountUnitInfo.sxrb
+        case .rai: return AmountUnitInfo.sxrb
         }
     }
     

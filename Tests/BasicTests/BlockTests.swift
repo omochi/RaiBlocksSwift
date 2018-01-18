@@ -10,12 +10,10 @@ import Basic
 import BigInt
 
 class BlockTests: XCTestCase {
-    
-    
     func testSendBlockHash1() throws {
         let prev = Block.Hash(hexString: "D7E659B9C448B241157BECA5DDA1B4F451555AE16149D161013C028DC36800A9")
         let dest = try Account.Address(string: "xrb_3d69nxbox9qiokkxduazombodwj73mpegrbne1dq1884d37iodtbwnqr163p")
-        let amount = Amount(4459900, unit: .sxrb)
+        let amount = Amount(4459900, unit: .rai)
         
         var blake = Blake2B.init(outputSize: 32)
         blake.update(data: prev.asData())
@@ -30,7 +28,7 @@ class BlockTests: XCTestCase {
     func testSendBlockHash2() throws {
         let block = SendBlock.init(previous: Block.Hash(hexString: "D7E659B9C448B241157BECA5DDA1B4F451555AE16149D161013C028DC36800A9"),
                                    destination: try Account.Address(string: "xrb_3d69nxbox9qiokkxduazombodwj73mpegrbne1dq1884d37iodtbwnqr163p"),
-                                   balance: Amount(4459900, unit: .sxrb),
+                                   balance: Amount(4459900, unit: .rai),
                                    work: Work(0),
                                    signature: Signature(data: Data.init(count: 64)))
         let hash = block.hash
