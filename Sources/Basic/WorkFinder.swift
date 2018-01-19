@@ -2,11 +2,6 @@ import Foundation
 
 public class WorkFinder {
     public class Task {
-        public var hash: Block.Hash
-        public var threshold: UInt64
-        public var completeHandler: (Work) -> Void
-        public var bestScore: UInt64
-
         public init(hash: Block.Hash,
                     threshold: UInt64,
                     completeHandler: @escaping (Work) -> Void)
@@ -17,21 +12,64 @@ public class WorkFinder {
             self.bestScore = 0
         }
         
-        public convenience init(task: Task) {
-            self.init(hash: task.hash,
-                      threshold: task.threshold,
-                      completeHandler: task.completeHandler)
-        }
+        public let hash: Block.Hash
+        public let threshold: UInt64
+        public let completeHandler: (Work) -> Void
+        
+        public var bestScore: UInt64
     }
     
-    public class WorkerInfo {
-        public let task: Task
-        public var bestScore: UInt64
-        
-        public init(task: Task) {
+    public class Worker {
+        public init(index: Int,
+                    task: Task,
+                    bestScoreHandler: @escaping (UInt64) -> Void,
+                    completeHandler: @escaping (Work) -> Void)
+        {
+            self.queue = DispatchQueue.init(label: "WorkFinder.Worker[\(index)]")
             self.task = task
+            self.bestScoreHandler = bestScoreHandler
+            self.completeHandler = completeHandler
+            self.terminated = false
             self.bestScore = 0
+            queue.async {
+                self.run()
+            }
         }
+        
+        public func terminate() {
+            queue.sync {
+                terminated = true
+            }
+        }
+        
+        private func run() {
+            if terminated {
+                return
+            }
+            
+            for _ in 0..<1000 {
+                let work = Work.generateRandom()
+                let score = task.hash.score(of: work)
+                if bestScore < score {
+                    bestScore = score
+                    bestScoreHandler(score)
+                }
+                if score >= task.threshold {
+                    completeHandler(work)
+                    return
+                }
+            }
+            
+            queue.async { self.run() }
+        }
+        
+        private let queue: DispatchQueue
+        private let task: Task
+        private let bestScoreHandler: (UInt64) -> Void
+        private let completeHandler: (Work) -> Void
+        private var terminated: Bool
+        
+        private var bestScore: UInt64
     }
     
     public init(callbackQueue: DispatchQueue,
@@ -41,12 +79,8 @@ public class WorkFinder {
         self.callbackQueue = callbackQueue
         terminated = false
         
-        let workerNum = workerNum ?? ProcessInfo().activeProcessorCount
-        var workers: [Worker<WorkerInfo>] = []
-        for i in 0..<workerNum {
-            workers.append(Worker.init(name: "WorkFinder.Worker[\(i)]"))
-        }
-        self.workers = workers
+        self.workerNum = workerNum ?? ProcessInfo().activeProcessorCount
+        workers = []
         
         pendingTasks = []
     }
@@ -55,7 +89,7 @@ public class WorkFinder {
         queue.sync {
             currentTask = nil
             pendingTasks.removeAll()
-            self.terminated = true
+            terminated = true
         }
     }
     
@@ -81,33 +115,20 @@ public class WorkFinder {
         
         currentTask = task
         
-        workers.forEach { worker in
-            let info = WorkerInfo.init(task: task)
-            worker.start(info: info) {
-                self.process(info: $0)
-            }
+        for index in 0..<workerNum {
+            let worker = Worker.init(index: index, task: task,
+                                     bestScoreHandler: { score in
+                                        self.queue.async {
+                                            self.updateBestScore(task: task, score: score)
+                                        }
+            },
+                                     completeHandler: { work in
+                                        self.queue.async {
+                                            self.complete(task: task, work: work)
+                                        }
+            })
+            workers.append(worker)
         }
-    }
-    
-    private func process(info: WorkerInfo) -> Bool {
-        let task = info.task
-        for _ in 0..<1000 {
-            let work = Work.generateRandom()
-            let score = task.hash.score(of: work)
-            if info.bestScore < score {
-                info.bestScore = score
-                queue.async {
-                    self.updateBestScore(task: task, score: score)
-                }
-            }
-            if score >= task.threshold {
-                queue.async {
-                    self.complete(task: task, work: work)
-                }
-                return false
-            }
-        }
-        return true
     }
     
     private func updateBestScore(task: Task, score: UInt64) {
@@ -127,10 +148,9 @@ public class WorkFinder {
         }
         
         workers.forEach { worker in
-            worker.pause()
+            worker.terminate()
         }
-        
-        let task = currentTask!
+        workers.removeAll()
         currentTask = nil
         
         callbackQueue.async {
@@ -154,10 +174,11 @@ public class WorkFinder {
     
     private let queue: DispatchQueue
     private let callbackQueue: DispatchQueue
+    private let workerNum: Int
     private var terminated: Bool
     
     private var currentTask: Task?
-    private var workers: [Worker<WorkerInfo>]
+    private var workers: [Worker]
     private var pendingTasks: [Task]
 }
 
