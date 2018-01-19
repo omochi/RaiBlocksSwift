@@ -45,5 +45,26 @@ class BlockTests: XCTestCase {
         
         XCTAssertTrue(block.verifySignature(address: address))
     }
+    
+    func testWorkScore1() {
+        let hashHex = "D7E659B9C448B241157BECA5DDA1B4F451555AE16149D161013C028DC36800A9"
+        let workHex = "24334bb782f6fade"
+        
+        let blake = Blake2B.init(outputSize: 8)
+        blake.update(data: Data(Data.init(hexString: workHex).reversed()))
+        blake.update(data: Data(Data.init(hexString: hashHex)))
+        let data = blake.finalize()
+        let sc = data.withUnsafeBytes { (p: UnsafePointer<UInt64>) in
+            p.pointee
+        }
+        XCTAssertGreaterThanOrEqual(sc, 0xFFFFFFC000000000)
+    }
+    
+    func testWorkScore2() {
+        let hash = Block.Hash.init(hexString: "D7E659B9C448B241157BECA5DDA1B4F451555AE16149D161013C028DC36800A9")
+        let work = Work.init(0x24334bb782f6fade)
+        let score = hash.score(of: work)
+        XCTAssertGreaterThanOrEqual(score, 0xFFFFFFC000000000)
+    }
 
 }

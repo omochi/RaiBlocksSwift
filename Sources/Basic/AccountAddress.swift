@@ -14,10 +14,12 @@ extension Account.Address {
 }
 
 extension Account.Address {
-    public var checkValue: BigUInt {
-        var hash = Blake2B.compute(data: asData(), outputSize: 5)
-        hash.reverse()
-        return hash.asBigUInt()
+    public var checkValue: UInt64 {
+        var data = Blake2B.compute(data: asData(), outputSize: 5)
+        data.append(contentsOf: [0, 0, 0])
+        return data.withUnsafeBytes { (p: UnsafePointer<UInt64>) in
+            return p.pointee
+        }
     }
 }
 
@@ -33,12 +35,11 @@ internal struct AccountAddressFormatter {
     }
     
     public func format(address: Account.Address) -> String {
-        let check = address.checkValue
-        assert(check.bitWidth <= 40)
+        let checkValue = address.checkValue
         
         var number = address.asBigUInt()
         number <<= 40
-        number |= check
+        number |= BigUInt(checkValue)
         assert(number.bitWidth <= 296)
         
         var str = String.init()
@@ -99,7 +100,7 @@ internal struct AccountAddressParser {
         
         let address = Account.Address.init(bigUInt: number >> 40)
         
-        let check = number & 0xFF_FF_FF_FF_FF
+        let check = UInt64(number & 0xFF_FF_FF_FF_FF)
         guard address.checkValue == check else {
             throw GenericError.init(message: "check hash is invalid: \(string)")
         }
