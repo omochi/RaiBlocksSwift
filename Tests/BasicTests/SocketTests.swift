@@ -14,8 +14,8 @@ class SocketTests: XCTestCase {
         let exp = self.expectation(description: "")
         
         let socket = try TCPSocket.init(callbackQueue: .main)
-        socket.connect(endPoint: IPv6.EndPoint(address: IPv6.Address(string: "2001:218:3001:7:0:0:0:b0")!,
-                                               port: 80),
+        socket.connect(endPoint: IPv6.EndPoint(address: IPv6.Address(string: "2001:19f0:5801:332:5400:ff:fe50:7ed7")!,
+                                               port: 7075),
                        successHandler: { exp.fulfill() },
                        errorHandler:{ error in
                         XCTFail()
@@ -120,4 +120,5 @@ class SocketTests: XCTestCase {
         
         wait(for: [exp1, exp2], timeout: 10.0)
     }
+    
 }
