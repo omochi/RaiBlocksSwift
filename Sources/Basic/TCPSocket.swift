@@ -8,49 +8,17 @@
 import Foundation
 
 public class TCPSocket {
-    public init(callbackQueue: DispatchQueue) throws {
+    public convenience init(callbackQueue: DispatchQueue) throws {
         let socket = Darwin.socket(PF_INET6, SOCK_STREAM, 0)
         if socket == -1 {
             throw PosixError.init(errno: errno, message: "socket()")
         }
-        
-        self.socket = socket
-        
-        let st = fcntl(socket, F_SETFL, O_NONBLOCK)
-        if st == -1 {
-           throw PosixError.init(errno: errno, message: "fcntl(F_SETFL, O_NONBLOCK)")
-        }
-        
-        queue = DispatchQueue.init(label: "TCPSocket.queue")
-        self.callbackQueue = callbackQueue
-        
-        readSource = DispatchSource.makeReadSource(fileDescriptor: socket, queue: queue)
-        readSuspended = true
-        
-        writeSource = DispatchSource.makeWriteSource(fileDescriptor: socket, queue: queue)
-        writeSuspended = true
-        
-        state = .inited
-        
-        readSource.setEventHandler {
-            switch self.state {
-            case .connected:
-                self.doReceive()
-            default:
-                return
-            }
-        }
-        writeSource.setEventHandler {
-            switch self.state {
-            case .connecting:
-                self.doConnectSuccess()
-            case .connected:
-                self.doSend()
-            default:
-                return
-            }
-        }
+        try self.init(socket: socket,
+                      callbackQueue: callbackQueue)
     }
+    
+    public let socket: Int32
+    public private(set) var peerEndPoint: IPv6.EndPoint?
     
     deinit {
         close()
@@ -63,7 +31,6 @@ public class TCPSocket {
             }
             
             _close()
-
             state = .closed
         }
     }
@@ -74,7 +41,20 @@ public class TCPSocket {
     {
         queue.sync {
             precondition(state == .inited)
-            precondition(writeSuspended)
+            assert(writeSuspended)
+            
+            var sockAddr = endPoint.asSockAddr()
+            let st = UnsafeMutablePointer(&sockAddr)
+                .withMemoryRebound(to: sockaddr.self, capacity: 1) { sockAddr in
+                    Darwin.connect(socket, sockAddr, UInt32(MemoryLayout<sockaddr_in6>.size))
+            }
+            if st != 0 {
+                if errno != EINPROGRESS {
+                    doError(error: PosixError.init(errno: errno, message: "connect(\(endPoint))"),
+                            callbackHandler: errorHandler)
+                    return
+                }
+            }
             
             resumeWrite()
             
@@ -84,23 +64,12 @@ public class TCPSocket {
                 self.doConnectError(error: GenericError.init(message: "connect(\(endPoint)) timeout"))
             }
             timer.resume()
-            let task = ConnectTask.init(timer: timer,
+            let task = ConnectTask.init(endPoint: endPoint,
+                                        timer: timer,
                                         successHandler: successHandler,
                                         errorHandler: errorHandler)
             connectTask = task
             state = .connecting
-            
-            var sockAddr = endPoint.asSockAddr()
-            let st = UnsafeMutablePointer(&sockAddr)
-                .withMemoryRebound(to: sockaddr.self, capacity: 1) { sockAddr in
-                    Darwin.connect(socket, sockAddr, UInt32(MemoryLayout<sockaddr_in6>.size))
-            }
-            if st != 0 {
-                if errno != EINPROGRESS {
-                    doConnectError(error: PosixError.init(errno: errno, message: "connect(\(endPoint))"))
-                    return
-                }
-            }
         }
     }
     
@@ -138,25 +107,68 @@ public class TCPSocket {
         }
     }
     
-    public let socket: Int32
-    
+    public func listen(port: Int) throws {
+        func body() throws {
+            precondition(state == .inited)
+            
+            var st = Darwin.setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, nil, 0)
+            if st != 0 {
+                throw PosixError.init(errno: errno, message: "setsockopt(SO_REUSEADDR)")
+            }
+            
+            var sockAddr = sockaddr_in6.init(sin6_len: UInt8(MemoryLayout<sockaddr_in6>.size),
+                                             sin6_family: UInt8(AF_INET6),
+                                             sin6_port: NSSwapHostShortToBig(UInt16(port)),
+                                             sin6_flowinfo: 0,
+                                             sin6_addr: in6addr_any,
+                                             sin6_scope_id: 0)
+            st = UnsafeMutablePointer(&sockAddr).withMemoryRebound(to: sockaddr.self, capacity: 1) { sockAddr in
+                Darwin.bind(socket, sockAddr, UInt32(MemoryLayout<sockaddr_in6>.size))
+            }
+            if st != 0 {
+                throw PosixError.init(errno: errno, message: "bind(\(port))")
+            }
+            
+            st = Darwin.listen(socket, 8)
+            if st != 0 {
+                throw PosixError.init(errno: errno, message: "listen(\(port))")
+            }
+            
+            state = .listening
+        }
+        
+        try queue.sync {
+            do {
+                try body()
+            } catch let error {
+                _close()
+                state = .error
+                throw error
+            }
+        }
+    }
+
     private enum State {
         case inited
         case connecting
         case connected
+        case listening
         case closed
         case error
     }
     
     private class ConnectTask {
+        public let endPoint: IPv6.EndPoint
         public let timer: DispatchSourceTimer
         public let successHandler: () -> Void
         public let errorHandler: (Error) -> Void
 
-        public init(timer: DispatchSourceTimer,
+        public init(endPoint: IPv6.EndPoint,
+                    timer: DispatchSourceTimer,
                     successHandler: @escaping () -> Void,
                     errorHandler: @escaping (Error) -> Void)
         {
+            self.endPoint = endPoint
             self.timer = timer
             self.successHandler = successHandler
             self.errorHandler = errorHandler
@@ -196,15 +208,60 @@ public class TCPSocket {
         }
     }
     
+    private init(socket: Int32,
+                 callbackQueue: DispatchQueue) throws
+    {
+        self.socket = socket
+        
+        let st = fcntl(socket, F_SETFL, O_NONBLOCK)
+        if st == -1 {
+            throw PosixError.init(errno: errno, message: "fcntl(F_SETFL, O_NONBLOCK)")
+        }
+        
+        queue = DispatchQueue.init(label: "TCPSocket.queue")
+        self.callbackQueue = callbackQueue
+        
+        readSource = DispatchSource.makeReadSource(fileDescriptor: socket, queue: queue)
+        readSuspended = true
+        
+        writeSource = DispatchSource.makeWriteSource(fileDescriptor: socket, queue: queue)
+        writeSuspended = true
+        
+        state = .inited
+        
+        readSource.setEventHandler {
+            switch self.state {
+            case .connected:
+                self.doReceive()
+            case .listening:
+                self.doAccept()
+            default:
+                return
+            }
+        }
+        writeSource.setEventHandler {
+            switch self.state {
+            case .connecting:
+                self.doConnectSuccess()
+            case .connected:
+                self.doSend()
+            default:
+                return
+            }
+        }
+    }
+    
     private func doConnectSuccess() {
         assert(state == .connecting)
         
+        suspendWrite()
+        
         let task = connectTask!
         task.close()
-        self.connectTask = nil
+        connectTask = nil
         
-        suspendWrite()
         state = .connected
+        peerEndPoint = task.endPoint
         
         postCallback {
             task.successHandler()
@@ -229,6 +286,8 @@ public class TCPSocket {
     }
     
     private func _close() {
+        peerEndPoint = nil
+        
         connectTask?.close()
         connectTask = nil
         
@@ -288,7 +347,6 @@ public class TCPSocket {
             }
             if st == -1 {
                 if errno == EAGAIN {
-                    print("EAGAIN")
                     break
                 }
                 
@@ -307,6 +365,10 @@ public class TCPSocket {
         postCallback {
             task.successHandler(data)
         }
+    }
+    
+    private func doAccept() {
+        
     }
     
     private func resumeRead() {

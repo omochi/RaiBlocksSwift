@@ -12,13 +12,12 @@ class SocketTests: XCTestCase {
     
     func testConnect1() throws {
         let exp = self.expectation(description: "")
+        
         let socket = try TCPSocket.init(callbackQueue: .main)
         socket.connect(endPoint: IPv6.EndPoint(address: IPv6.Address(string: "2001:218:3001:7:0:0:0:b0")!,
                                                port: 80),
-                       successHandler: {
-                        exp.fulfill()
-        },
-                       errorHandler: { error in
+                       successHandler: { exp.fulfill() },
+                       errorHandler:{ error in
                         XCTFail()
                         exp.fulfill()
         })
@@ -27,17 +26,17 @@ class SocketTests: XCTestCase {
     
     func testWriteRead1() throws {
         let exp = self.expectation(description: "")
-        let socket = try TCPSocket.init(callbackQueue: .main)
+        let socket: TCPSocket = try TCPSocket.init(callbackQueue: .main)
         var response = Data.init()
-        
+
         socket.connect(endPoint: IPv6.EndPoint(address: IPv6.Address(string: "2001:218:3001:7::b0")!,
                                                port: 80),
                        successHandler: {
                         send()
         },
-                       errorHandler: { error in
-                        XCTFail(String(describing: error))
-                        exp.fulfill()
+                          errorHandler: { error in
+                            XCTFail(String(describing: error))
+                            exp.fulfill()
         })
         
         func send() {
