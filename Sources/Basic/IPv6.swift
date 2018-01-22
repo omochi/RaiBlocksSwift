@@ -8,6 +8,18 @@ public enum IPv6 {
 
         public let addr: in6_addr
     }
+    
+    public struct EndPoint {
+        public init(address: Address,
+                    port: Int)
+        {
+            self.address = address
+            self.port = port
+        }
+        
+        public var address: Address
+        public var port: Int
+    }
 }
 
 extension IPv6.Address : CustomStringConvertible {
@@ -37,4 +49,21 @@ extension IPv6.Address : Equatable {}
 
 public func ==(a: IPv6.Address, b: IPv6.Address) -> Bool {
     return a.addr.__u6_addr.__u6_addr32 == b.addr.__u6_addr.__u6_addr32
+}
+
+extension IPv6.EndPoint : CustomStringConvertible {
+    public var description: String {
+        return "[\(address)]:\(port)"
+    }
+}
+
+extension IPv6.EndPoint {
+    public func asSockAddr() -> sockaddr_in6 {
+        return sockaddr_in6.init(sin6_len: UInt8(MemoryLayout<sockaddr_in6>.size),
+                                 sin6_family: UInt8(AF_INET6),
+                                 sin6_port: NSSwapHostShortToBig(UInt16(port)),
+                                 sin6_flowinfo: 0,
+                                 sin6_addr: address.addr,
+                                 sin6_scope_id: 0)
+    }
 }
