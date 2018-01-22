@@ -13,12 +13,14 @@ public class TCPSocket {
         if socket == -1 {
             throw PosixError.init(errno: errno, message: "socket()")
         }
+        
         try self.init(socket: socket,
+                      endPoint: nil,
                       callbackQueue: callbackQueue)
     }
     
     public let socket: Int32
-    public private(set) var peerEndPoint: IPv6.EndPoint?
+    public private(set) var endPoint: IPv6.EndPoint?
     
     deinit {
         close()
@@ -39,7 +41,7 @@ public class TCPSocket {
                         successHandler: @escaping () -> Void,
                         errorHandler: @escaping (Error) -> Void)
     {
-        queue.sync {
+        func body() throws {
             precondition(state == .inited)
             assert(writeSuspended)
             
@@ -50,9 +52,7 @@ public class TCPSocket {
             }
             if st != 0 {
                 if errno != EINPROGRESS {
-                    doError(error: PosixError.init(errno: errno, message: "connect(\(endPoint))"),
-                            callbackHandler: errorHandler)
-                    return
+                    throw PosixError.init(errno: errno, message: "connect(\(endPoint))")
                 }
             }
             
@@ -61,7 +61,8 @@ public class TCPSocket {
             let timer = DispatchSource.makeTimerSource(flags: [], queue: queue)
             timer.schedule(deadline: .now() + connectTimeoutInterval)
             timer.setEventHandler {
-                self.doConnectError(error: GenericError.init(message: "connect(\(endPoint)) timeout"))
+                self.doError(error: GenericError.init(message: "connect(\(endPoint)) timeout"),
+                             callbackHandler: errorHandler)
             }
             timer.resume()
             let task = ConnectTask.init(endPoint: endPoint,
@@ -70,6 +71,14 @@ public class TCPSocket {
                                         errorHandler: errorHandler)
             connectTask = task
             state = .connecting
+        }
+        
+        queue.sync {
+            do {
+                try body()
+            } catch let error {
+                self.doError(error: error, callbackHandler: errorHandler)
+            }
         }
     }
     
@@ -107,11 +116,15 @@ public class TCPSocket {
         }
     }
     
-    public func listen(port: Int) throws {
+    public func listen(port: Int, backlog: Int = 8) throws {
         func body() throws {
             precondition(state == .inited)
             
-            var st = Darwin.setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, nil, 0)
+            var intValue: CInt = 1
+            
+            var st = Darwin.setsockopt(socket, SOL_SOCKET, SO_REUSEADDR,
+                                       UnsafeMutablePointer(&intValue),
+                                       UInt32(MemoryLayout<CInt>.size))
             if st != 0 {
                 throw PosixError.init(errno: errno, message: "setsockopt(SO_REUSEADDR)")
             }
@@ -129,7 +142,7 @@ public class TCPSocket {
                 throw PosixError.init(errno: errno, message: "bind(\(port))")
             }
             
-            st = Darwin.listen(socket, 8)
+            st = Darwin.listen(socket, Int32(backlog))
             if st != 0 {
                 throw PosixError.init(errno: errno, message: "listen(\(port))")
             }
@@ -145,6 +158,20 @@ public class TCPSocket {
                 state = .error
                 throw error
             }
+        }
+    }
+    
+    public func accept(successHandler: @escaping (TCPSocket) -> Void,
+                       errorHandler: @escaping (Error) -> Void)
+    {
+        queue.sync {
+            precondition(state == .listening)
+            precondition(acceptTask == nil)
+            
+            let task = AcceptTask.init(successHandler: successHandler,
+                                       errorHandler: errorHandler)
+            acceptTask = task
+            resumeRead()
         }
     }
 
@@ -208,10 +235,24 @@ public class TCPSocket {
         }
     }
     
+    private class AcceptTask {
+        public var successHandler: (TCPSocket) -> Void
+        public var errorHandler: (Error) -> Void
+        
+        public init(successHandler: @escaping (TCPSocket) -> Void,
+                    errorHandler: @escaping (Error) -> Void)
+        {
+            self.successHandler = successHandler
+            self.errorHandler = errorHandler
+        }
+    }
+    
     private init(socket: Int32,
+                 endPoint: IPv6.EndPoint?,
                  callbackQueue: DispatchQueue) throws
     {
         self.socket = socket
+        self.endPoint = endPoint
         
         let st = fcntl(socket, F_SETFL, O_NONBLOCK)
         if st == -1 {
@@ -227,7 +268,11 @@ public class TCPSocket {
         writeSource = DispatchSource.makeWriteSource(fileDescriptor: socket, queue: queue)
         writeSuspended = true
         
-        state = .inited
+        if endPoint == nil {
+            state = .inited
+        } else {
+            state = .connected
+        }
         
         readSource.setEventHandler {
             switch self.state {
@@ -239,6 +284,7 @@ public class TCPSocket {
                 return
             }
         }
+        
         writeSource.setEventHandler {
             switch self.state {
             case .connecting:
@@ -261,7 +307,7 @@ public class TCPSocket {
         connectTask = nil
         
         state = .connected
-        peerEndPoint = task.endPoint
+        endPoint = task.endPoint
         
         postCallback {
             task.successHandler()
@@ -286,13 +332,14 @@ public class TCPSocket {
     }
     
     private func _close() {
-        peerEndPoint = nil
+        endPoint = nil
         
         connectTask?.close()
         connectTask = nil
         
         receiveTask = nil
         sendTask = nil
+        acceptTask = nil
         
         if readSuspended {
             resumeRead()
@@ -310,65 +357,111 @@ public class TCPSocket {
     private func doSend() {
         let task = sendTask!
         
-        let st = task.data.withUnsafeBytes { p in
-            Darwin.send(socket, p + task.sentSize, task.data.count - task.sentSize, 0)
-        }
-        if st == -1 {
-            if errno == EAGAIN {
+        func body() throws {
+            let st = task.data.withUnsafeBytes { p in
+                Darwin.send(socket, p + task.sentSize, task.data.count - task.sentSize, 0)
+            }
+            if st == -1 {
+                if errno == EAGAIN {
+                    return
+                }
+                
+                throw PosixError.init(errno: errno, message: "send()")
+            }
+            
+            task.sentSize += st
+            if task.sentSize < task.data.count {
                 return
             }
             
-            doError(error: PosixError.init(errno: errno, message: "send()"),
-                    callbackHandler: task.errorHandler)
-            return
+            sendTask = nil
+            suspendWrite()
+            postCallback {
+                task.successHandler()
+            }
         }
         
-        task.sentSize += st
-        if task.sentSize < task.data.count {
-            return
+        do {
+            try body()
+        } catch let error {
+            doError(error: error, callbackHandler: task.errorHandler)
         }
 
-        sendTask = nil
-        suspendWrite()
-        postCallback {
-            task.successHandler()
-        }
     }
     
     private func doReceive() {
         let task = receiveTask!
         
-        var data = Data.init()
-        
-        while true {
-            var chunk = Data.init(count: 1024)
-            let st = chunk.withUnsafeMutableBytes { p in
-                Darwin.recv(socket, p, chunk.count, 0)
-            }
-            if st == -1 {
-                if errno == EAGAIN {
+        func body() throws {
+            var data = Data.init()
+            
+            while true {
+                var chunk = Data.init(count: 1024)
+                let st = chunk.withUnsafeMutableBytes { p in
+                    Darwin.recv(socket, p, chunk.count, 0)
+                }
+                if st == -1 {
+                    if errno == EAGAIN {
+                        break
+                    }
+                    
+                    throw PosixError.init(errno: errno, message: "read()")
+                } else if st == 0 {
                     break
                 }
                 
-                doError(error: PosixError.init(errno: errno, message: "read()"),
-                        callbackHandler: task.errorHandler)
-                return
-            } else if st == 0 {
-                break
+                chunk.count = st
+                data.append(chunk)
             }
-            chunk.count = st
-            data.append(chunk)
+            
+            receiveTask = nil
+            suspendRead()
+            postCallback {
+                task.successHandler(data)
+            }
         }
         
-        receiveTask = nil
-        suspendRead()
-        postCallback {
-            task.successHandler(data)
+        do {
+            try body()
+        } catch let error {
+            doError(error: error, callbackHandler: task.errorHandler)
         }
     }
     
     private func doAccept() {
+        let task = acceptTask!
         
+        func body() throws {
+            var sockAddr = sockaddr_in6.init()
+            var sockAddrSize = UInt32(MemoryLayout<sockaddr_in6>.size)
+            let st = UnsafeMutablePointer(&sockAddr).withMemoryRebound(to: sockaddr.self, capacity: 1) { sockAddr in
+                Darwin.accept(socket, sockAddr, UnsafeMutablePointer(&sockAddrSize))                
+            }
+            if st == -1 {
+                if errno == EWOULDBLOCK {
+                    return
+                }
+                
+                throw PosixError.init(errno: errno, message: "accept()")
+            }
+            
+            let newSocket = try TCPSocket.init(socket: st,
+                                               endPoint: IPv6.EndPoint.init(sockAddr: sockAddr),
+                                               callbackQueue: callbackQueue)
+            
+            acceptTask = nil
+            suspendRead()
+            
+            postCallback {
+                task.successHandler(newSocket)
+            }
+        }
+        
+        do {
+            try body()
+        } catch let error {
+            doError(error: error, callbackHandler: task.errorHandler)
+        }
     }
     
     private func resumeRead() {
@@ -414,4 +507,5 @@ public class TCPSocket {
     private var connectTask: ConnectTask?
     private var sendTask: SendTask?
     private var receiveTask: ReceiveTask?
+    private var acceptTask: AcceptTask?
 }

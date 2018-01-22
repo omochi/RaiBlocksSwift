@@ -76,4 +76,48 @@ class SocketTests: XCTestCase {
         wait(for: [exp], timeout: 10.0)
     }
     
+    func testListen1() throws {
+        let exp1 = self.expectation(description: "listenSocket")
+        
+        let listenSocket = try TCPSocket.init(callbackQueue: .main)
+        try listenSocket.listen(port: 4567)
+        listenSocket.accept(successHandler: { socket in
+            let message = "hello client"
+            socket.send(data: message.data(using: .utf8)!,
+                        successHandler: {
+                            exp1.fulfill()
+            },
+                        errorHandler: { error in
+                            XCTFail(String(describing: error))
+                            exp1.fulfill()
+            })
+        },
+                            errorHandler: { error in
+                                XCTFail(String(describing: error))
+                                exp1.fulfill()
+        })
+        
+        let exp2 = self.expectation(description: "clientSocket")
+        
+        let clientSocket = try TCPSocket.init(callbackQueue: .main)
+        clientSocket.connect(endPoint: IPv6.EndPoint(address: IPv6.Address(string: "::1")!,
+                                                     port: 4567),
+                             successHandler: { 
+                                clientSocket.receive(successHandler: { data in
+                                    let str = String.init(data: data, encoding: .utf8)!
+                                    XCTAssertEqual(str, "hello client")
+                                    exp2.fulfill()
+                                },
+                                                     errorHandler: { error in
+                                                        XCTFail(String(describing: error))
+                                                        exp2.fulfill()
+                                })
+        },
+                             errorHandler: { error in
+                                XCTFail(String(describing: error))
+                                exp2.fulfill()
+        })
+        
+        wait(for: [exp1, exp2], timeout: 10.0)
+    }
 }

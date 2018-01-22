@@ -58,6 +58,11 @@ extension IPv6.EndPoint : CustomStringConvertible {
 }
 
 extension IPv6.EndPoint {
+    public init(sockAddr: sockaddr_in6) {
+        self.init(address: IPv6.Address(addr: sockAddr.sin6_addr),
+                  port: Int(NSSwapBigShortToHost(sockAddr.sin6_port)))
+    }
+    
     public func asSockAddr() -> sockaddr_in6 {
         return sockaddr_in6.init(sin6_len: UInt8(MemoryLayout<sockaddr_in6>.size),
                                  sin6_family: UInt8(AF_INET6),
