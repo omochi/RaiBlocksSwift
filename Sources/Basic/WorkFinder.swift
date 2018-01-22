@@ -9,67 +9,18 @@ public class WorkFinder {
             self.hash = hash
             self.threshold = threshold
             self.completeHandler = completeHandler
-            self.bestScore = 0
         }
         
         public let hash: Block.Hash
         public let threshold: UInt64
         public let completeHandler: (Work) -> Void
         
-        public var bestScore: UInt64
+        public var result: FindResult?
     }
     
-    public class Worker {
-        public init(index: Int,
-                    task: Task,
-                    bestScoreHandler: @escaping (UInt64) -> Void,
-                    completeHandler: @escaping (Work) -> Void)
-        {
-            self.queue = DispatchQueue.init(label: "WorkFinder.Worker[\(index)]")
-            self.task = task
-            self.bestScoreHandler = bestScoreHandler
-            self.completeHandler = completeHandler
-            self.terminated = false
-            self.bestScore = 0
-            queue.async {
-                self.run()
-            }
-        }
-        
-        public func terminate() {
-            queue.sync {
-                terminated = true
-            }
-        }
-        
-        private func run() {
-            if terminated {
-                return
-            }
-            
-            for _ in 0..<1000 {
-                let work = Work.generateRandom()
-                let score = task.hash.score(of: work)
-                if bestScore < score {
-                    bestScore = score
-                    bestScoreHandler(score)
-                }
-                if score >= task.threshold {
-                    completeHandler(work)
-                    return
-                }
-            }
-            
-            queue.async { self.run() }
-        }
-        
-        private let queue: DispatchQueue
-        private let task: Task
-        private let bestScoreHandler: (UInt64) -> Void
-        private let completeHandler: (Work) -> Void
-        private var terminated: Bool
-        
-        private var bestScore: UInt64
+    public struct FindResult {
+        public var work: Work
+        public var score: UInt64
     }
     
     public init(callbackQueue: DispatchQueue,
@@ -80,7 +31,6 @@ public class WorkFinder {
         terminated = false
         
         self.workerNum = workerNum ?? ProcessInfo().activeProcessorCount
-        workers = []
         
         pendingTasks = []
     }
@@ -114,43 +64,49 @@ public class WorkFinder {
         precondition(currentTask == nil)
         
         currentTask = task
-        
-        for index in 0..<workerNum {
-            let worker = Worker.init(index: index, task: task,
-                                     bestScoreHandler: { score in
-                                        self.queue.async {
-                                            self.updateBestScore(task: task, score: score)
-                                        }
-            },
-                                     completeHandler: { work in
-                                        self.queue.async {
-                                            self.complete(task: task, work: work)
-                                        }
-            })
-            workers.append(worker)
-        }
+
+        startWorkers(task: task)
     }
     
-    private func updateBestScore(task: Task, score: UInt64) {
-        guard task === currentTask else {
+    private func startWorkers(task: Task) {
+        guard currentTask === task else {
             return
         }
         
-        if task.bestScore < score {
-            task.bestScore = score
-//            print(String(format: "bestScore: %016llx", score))
+        let group = DispatchGroup.init()
+        
+        for _ in 0..<workerNum {
+            group.enter()
+            DispatchQueue.global().async {
+                let result = WorkFinder._find(task: task)
+                self.queue.async {
+                    if let bestResult = task.result {
+                        guard bestResult.score < result.score else {
+                            return
+                        }
+                    }
+                    
+                    print(String(format: "bestScore: %016llx", result.score))
+                    task.result = result
+                }
+                group.leave()
+            }
+        }
+        
+        group.notify(queue: queue) {
+            if task.result!.score >= task.threshold {
+                self.complete(task: task)
+            } else {
+                self.startWorkers(task: task)
+            }
         }
     }
-    
-    private func complete(task: Task, work: Work) {
+
+    private func complete(task: Task) {
         guard task === currentTask else {
             return
         }
-        
-        workers.forEach { worker in
-            worker.terminate()
-        }
-        workers.removeAll()
+
         currentTask = nil
         
         callbackQueue.async {
@@ -159,7 +115,7 @@ public class WorkFinder {
                 return
             }
             
-            task.completeHandler(work)
+            task.completeHandler(task.result!.work)
         }
         
         if pendingTasks.count == 0 {
@@ -172,13 +128,30 @@ public class WorkFinder {
         startTask(nextTask)
     }
     
+    private static func _find(task: Task) -> FindResult {
+        var bestResult: FindResult?
+        
+        for _ in 0..<10000 {
+            let work = Work.generateRandom()
+            let score = task.hash.score(of: work)
+            if let bestResult = bestResult {
+                guard bestResult.score < score else {
+                    continue
+                }
+            }
+            
+            bestResult = FindResult(work: work, score: score)
+        }
+        
+        return bestResult!
+    }
+    
     private let queue: DispatchQueue
     private let callbackQueue: DispatchQueue
     private let workerNum: Int
     private var terminated: Bool
     
     private var currentTask: Task?
-    private var workers: [Worker]
     private var pendingTasks: [Task]
 }
 
