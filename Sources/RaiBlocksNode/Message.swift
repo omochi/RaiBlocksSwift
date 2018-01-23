@@ -2,7 +2,7 @@ import Foundation
 import RaiBlocksBasic
 
 public enum Message {
-    public enum Kind : UInt8 {
+    public enum Kind : UInt8, DataWritable {
         case invalid = 0
         case notAKind
         case keepAlive
@@ -12,9 +12,13 @@ public enum Message {
         case bulkPull
         case bulkPush
         case accountRequest
+        
+        public func write(to writer: DataWriter) {
+            writer.write(rawValue)
+        }
     }
     
-    public struct Header {
+    public struct Header : DataWritable {
         public var magicNumber: UInt16
         public var versionMax: UInt8
         public var versionUsing: UInt8
@@ -57,6 +61,12 @@ public enum Message {
         }
         
         public func write(to writer: DataWriter) {
+            writer.write(magicNumber)
+            writer.write(versionMax)
+            writer.write(versionUsing)
+            writer.write(versionMin)
+            writer.write(kind)
+            writer.write(extensions)
         }
         
         public static let ipv4OnlyBitIndex: Int = 1
@@ -67,7 +77,7 @@ public enum Message {
         public static let blockKindMask: UInt16 = 0x0F00
     }
     
-    public struct AccountRequest {
+    public struct AccountRequest : DataWritable {
         public var header: Header
         public var start: Account.Address
         public var age: UInt32
@@ -78,6 +88,23 @@ public enum Message {
             self.start = .init()
             self.age = 0
             self.count = 0
+        }
+        
+        public func write(to writer: DataWriter) {
+            writer.write(header)
+            writer.write(start)
+            writer.write(NSSwapHostIntToLittle(age))
+            writer.write(NSSwapHostIntToLittle(count))
+        }
+    }
+    
+    public struct AccountResponseEntry : DataReadable {
+        public var account: Account.Address
+        public var latestHash: Block.Hash
+        
+        public init(from reader: DataReader) throws {
+            account = try .init(from: reader)
+            latestHash = try .init(from: reader)
         }
     }
 }

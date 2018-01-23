@@ -148,3 +148,15 @@ extension Account.Address {
         return valid
     }
 }
+
+extension Account.Address : Equatable {}
+
+public func ==(a: Account.Address, b: Account.Address) -> Bool {
+    return a.asBigUInt() == b.asBigUInt()
+}
+
+extension Account.Address : Comparable {}
+
+public func <(a: Account.Address, b: Account.Address) -> Bool {
+    return a.asBigUInt() < b.asBigUInt()
+}

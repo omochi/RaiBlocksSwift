@@ -1,11 +1,20 @@
 import Foundation
 
 public enum Block {
-    public struct Hash {
+    public struct Hash : DataWritable, DataReadable {
         public init(data: Data) {
             precondition(data.count == 32)
             
             self._data = data
+        }
+        
+        public init(from reader: DataReader) throws {
+            let data = try reader.read(Data.self, size: 32)
+            self.init(data: data)
+        }
+        
+        public func write(to writer: DataWriter) {
+            writer.write(data: _data)
         }
         
         public func asData() -> Data {

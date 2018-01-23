@@ -45,11 +45,11 @@ public class TCPSocket {
                   errorHandler: errorHandler)
     }
     
-    public func receive(maxSize: Int,
+    public func receive(size: Int?,
                         successHandler: @escaping (Data) -> Void,
                         errorHandler: @escaping (Error) -> Void)
     {
-        impl.receive(maxSize: maxSize,
+        impl.receive(size: size,
                      successHandler: successHandler,
                      errorHandler: errorHandler)
     }
@@ -125,6 +125,7 @@ public class TCPSocket {
                             throw GenericError.init(message: "name resolve failed, no entry: hostname=\(hostname)")
                         }
                         endPoint.port = port
+                        print("connect: \(endPoint)")
                         try self._connect(endPoint: endPoint,
                                           successHandler: task.successHandler,
                                           errorHandler: task.errorHandler)
@@ -172,7 +173,7 @@ public class TCPSocket {
             }
         }
         
-        public func receive(maxSize: Int,
+        public func receive(size: Int?,
                             successHandler: @escaping (Data) -> Void,
                             errorHandler: @escaping (Error) -> Void)
         {
@@ -185,7 +186,7 @@ public class TCPSocket {
                 
                 socket.resumeRead()
                 
-                let task = ReceiveTask.init(maxSize: maxSize,
+                let task = ReceiveTask.init(size: size,
                                             successHandler: successHandler,
                                             errorHandler: errorHandler)
                 receiveTask = task
@@ -418,35 +419,47 @@ public class TCPSocket {
             func body() throws {
                 let socket = self.socket!
                 
-                var data = Data.init()
-                
                 while true {
-                    assert(data.count <= task.maxSize)
-                    if data.count == task.maxSize {
-                        break
+                    var chunk: Data
+                    
+                    if let size = task.size {
+                        let rem = size - task.data.count
+                        if rem == 0 {
+                            break
+                        }
+                        chunk = Data.init(count: rem)
+                    } else {
+                        chunk = Data.init(count: 1024)
                     }
                     
-                    var chunk = Data.init(count: task.maxSize - data.count)
                     let st = chunk.withUnsafeMutableBytes { p in
                         socket.recv(data: p, size: chunk.count)
                     }
                     if st == -1 {
                         if errno == EAGAIN {
-                            break
+                            if task.size == nil {
+                                break
+                            } else {
+                                return
+                            }
                         }
                         
-                        throw PosixError.init(errno: errno, message: "read()")
+                        throw PosixError.init(errno: errno, message: "read(\(chunk.count))")
                     } else if st == 0 {
-                        break
+                        if let size = task.size {
+                            throw GenericError.init(message: "receive(\(size)) failed: connection closed")
+                        } else {
+                            break
+                        }
                     }
                     chunk.count = st
-                    data.append(chunk)
+                    task.data.append(chunk)
                 }
                 
                 receiveTask = nil
                 socket.suspendRead()
                 postCallback {
-                    task.successHandler(data)
+                    task.successHandler(task.data)
                 }
             }
             
@@ -593,15 +606,17 @@ public class TCPSocket {
     }
     
     private class ReceiveTask {
-        public var maxSize: Int
+        public var data: Data
+        public var size: Int?
         public var successHandler: (Data) -> Void
         public var errorHandler: (Error) -> Void
         
-        public init(maxSize: Int,
+        public init(size: Int?,
                     successHandler: @escaping (Data) -> Void,
                     errorHandler: @escaping (Error) -> Void)
         {
-            self.maxSize = maxSize
+            self.data = Data.init()
+            self.size = size
             self.successHandler = successHandler
             self.errorHandler = errorHandler
         }

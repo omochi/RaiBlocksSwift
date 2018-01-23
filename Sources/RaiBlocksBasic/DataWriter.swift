@@ -48,5 +48,23 @@ public class DataWriter {
         }
     }
     
+    public func write<X: DataWritable>(_ value: X) {
+        value.write(to: self)
+    }
+    
     public private(set) var data: Data
 }
+
+public protocol DataWritable {
+    func write(to writer: DataWriter)
+}
+
+extension DataWritable {
+    public func asData() -> Data {
+        let writer = DataWriter()
+        self.write(to: writer)
+        return writer.data
+    }
+}
+
+

@@ -2,8 +2,8 @@ import Foundation
 import RaiBlocksCRandom
 
 public enum Random {
-    public static func getInt() -> Int {
-        return getValue(of: Int.self)
+    public static func getUInt() -> UInt {
+        return getValue(of: UInt.self)
     }
     
     public static func getUInt64() -> UInt64 {
@@ -31,7 +31,7 @@ extension Collection where Index == Int, IndexDistance == Int {
         guard count > 0 else {
             return nil
         }
-        let dice = Random.getInt() % count
+        let dice = Int(Random.getUInt() % UInt(count))
         return self.index(startIndex, offsetBy: dice)
     }
 }

@@ -44,6 +44,60 @@ public class BootstrapClient {
         }
     }
     
+    public func requestAccount(entryHandler: @escaping (Message.AccountResponseEntry, () -> Void) -> Void,
+                               errorHandler: @escaping (Error) -> Void) {
+        weak var wself = self
+        queue.sync {
+            var request = Message.AccountRequest.init()
+            request.age = UInt32.max
+            request.count = UInt32.max
+            
+            let data = request.asData()
+            
+            _socket!.send(data: data,
+                          successHandler: {
+                            wself?.receiveAccount(entryHandler: entryHandler,
+                                                  errorHandler: errorHandler)
+            },
+                          errorHandler: { error in
+                            wself?.doError(error, handler: errorHandler)
+            })
+        }
+    }
+    
+    private func receiveAccount(entryHandler: @escaping (Message.AccountResponseEntry, () -> Void) -> Void,
+                                errorHandler: @escaping (Error) -> Void)
+    {
+        weak var wself = self
+        
+        func next() {
+            guard let `self` = wself else { return }
+            self.queue.sync {
+                self.receiveAccount(entryHandler: entryHandler,
+                                    errorHandler: errorHandler)
+            }
+        }
+        
+        func nextEnd() {}
+        
+        _socket!.receive(size: 32 * 2,
+                         successHandler: { data in
+                            do {
+                                let entry = try Message.AccountResponseEntry.init(from: data)
+                                wself?.postCallback { _ in
+                                    if entry.account == Account.Address() {
+                                        entryHandler(entry, nextEnd)
+                                    } else {
+                                        entryHandler(entry, next)
+                                    }
+                                }
+                            } catch let error {
+                                wself?.doError(error, handler: errorHandler)
+                            }
+        },
+                         errorHandler: errorHandler)
+    }
+    
     private func _terminate() {
         _socket?.close()
         _socket = nil
