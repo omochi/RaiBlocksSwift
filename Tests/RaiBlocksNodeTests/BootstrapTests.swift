@@ -20,7 +20,7 @@ class BootstrapTests: XCTestCase {
                        successHandler: { connectHandler() },
                        errorHandler: errorHandler)
         
-        wait(for: [exp], timeout: 100.0)
+        wait(for: [exp], timeout: 3600 * 24)
         
         func connectHandler() {
             var i = 0
