@@ -15,11 +15,17 @@ public class NameResolveTask {
         self.queue = DispatchQueue.init(label: "NameResolveTask")
         self.terminated = false
         
+        weak var wself = self
+        
         DispatchQueue.global().async {
             let result = nameResolveSync(hostname: hostname)
             
             callbackQueue.async {
-                let terminated = self.queue.sync { self.terminated }
+                guard let sself = wself else {
+                    return
+                }
+                
+                let terminated = sself.queue.sync { sself.terminated }
                 if terminated {
                     return
                 }

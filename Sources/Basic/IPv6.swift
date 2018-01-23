@@ -5,6 +5,10 @@ public enum IPv6 {
         public init(addr: in6_addr) {
             self.addr = addr
         }
+        
+        public init() {
+            self.init(addr: in6_addr.init())
+        }
 
         public let addr: in6_addr
     }
@@ -15,6 +19,11 @@ public enum IPv6 {
         {
             self.address = address
             self.port = port
+        }
+        
+        public init() {
+            self.init(address: .init(),
+                      port: .init())
         }
         
         public var address: Address

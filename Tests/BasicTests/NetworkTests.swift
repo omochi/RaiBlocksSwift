@@ -15,11 +15,10 @@ class NetworkTests: XCTestCase {
         nameResolve(hostname: "raiblocks.net",
                     callbackQueue: .main,
                     resultHandler: { (addresses) in
-                        print(addresses)
                         XCTAssertTrue(addresses.contains { $0 == IPv6.Address(string: "2400:cb00:2048:1:0:0:681f:45b9")! })
                         XCTAssertTrue(addresses.contains { $0 == IPv6.Address(string: "2400:cb00:2048:1:0:0:681f:44b9")! })
                         exp.fulfill()
-        })        
+        })
         wait(for: [exp], timeout: 10.0)
     }
     

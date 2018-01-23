@@ -14,11 +14,12 @@ class SocketTests: XCTestCase {
         let exp = self.expectation(description: "")
         
         let socket = try TCPSocket.init(callbackQueue: .main)
-        socket.connect(endPoint: IPv6.EndPoint(address: IPv6.Address(string: "2001:19f0:5801:332:5400:ff:fe50:7ed7")!,
-                                               port: 7075),
-                       successHandler: { exp.fulfill() },
+        socket.connect(endPoint: .ipv4(IPv4.EndPoint(address: IPv4.Address(string: "117.104.133.164")!,
+                                                     port: 80)),
+                       successHandler: {
+                        exp.fulfill() },
                        errorHandler:{ error in
-                        XCTFail()
+                        XCTFail(String(describing: error))
                         exp.fulfill()
         })
         wait(for: [exp], timeout: 12.0)
@@ -29,8 +30,8 @@ class SocketTests: XCTestCase {
         let socket: TCPSocket = try TCPSocket.init(callbackQueue: .main)
         var response = Data.init()
 
-        socket.connect(endPoint: IPv6.EndPoint(address: IPv6.Address(string: "2001:218:3001:7::b0")!,
-                                               port: 80),
+        socket.connect(endPoint: .ipv4(IPv4.EndPoint(address: IPv4.Address(string: "117.104.133.164")!,
+                                                     port: 80)),
                        successHandler: {
                         send()
         },
@@ -79,9 +80,12 @@ class SocketTests: XCTestCase {
     func testListen1() throws {
         let exp1 = self.expectation(description: "listenSocket")
         
+        var sockets: [TCPSocket] = []
+        
         let listenSocket = try TCPSocket.init(callbackQueue: .main)
-        try listenSocket.listen(port: 4567)
+        try listenSocket.listen(protocolFamily: .ipv4, port: 4567)
         listenSocket.accept(successHandler: { socket in
+            sockets.append(socket)
             let message = "hello client"
             socket.send(data: message.data(using: .utf8)!,
                         successHandler: {
@@ -100,8 +104,8 @@ class SocketTests: XCTestCase {
         let exp2 = self.expectation(description: "clientSocket")
         
         let clientSocket = try TCPSocket.init(callbackQueue: .main)
-        clientSocket.connect(endPoint: IPv6.EndPoint(address: IPv6.Address(string: "::1")!,
-                                                     port: 4567),
+        clientSocket.connect(endPoint: .ipv4(IPv4.EndPoint(address: IPv4.Address(string: "127.0.0.1")!,
+                                                           port: 4567)),
                              successHandler: { 
                                 clientSocket.receive(successHandler: { data in
                                     let str = String.init(data: data, encoding: .utf8)!
