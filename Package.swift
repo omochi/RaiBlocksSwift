@@ -6,19 +6,17 @@ import PackageDescription
 let package = Package(
     name: "RaiBlocksSwift",
     products: [
-        .library(name: "RaiBlocksSwift", targets: ["RaiBlocksSwift"]),
+        .library(name: "RaiBlocksSwift", targets: ["RaiBlocksBasic"]),
         ],
     dependencies: [
         .package(url: "https://github.com/attaswift/BigInt.git", from: "3.0.2"),
         ],
     targets: [
-        .target(name: "CRandom", dependencies: []),
+        .target(name: "RaiBlocksCRandom", dependencies: []),
         .target(name: "BLAKE2", dependencies: []),
-        .target(name: "ED25519Donna", dependencies: ["BLAKE2", "CRandom"]),
-        .target(name: "Basic", dependencies: [
-            "CRandom", "BLAKE2", "ED25519Donna", "BigInt"]),
-        .target(name: "RaiBlocksSwift", dependencies: ["Basic"]),
-        .testTarget(name: "BasicTests", dependencies: ["Basic"]),
-        .testTarget(name: "RaiBlocksSwiftTests", dependencies: ["RaiBlocksSwift"]),
+        .target(name: "ED25519Donna", dependencies: ["BLAKE2", "RaiBlocksCRandom"]),
+        .target(name: "RaiBlocksBasic", dependencies: [
+            "BLAKE2", "ED25519Donna", "BigInt"]),
+        .testTarget(name: "RaiBlocksBasicTests", dependencies: ["RaiBlocksBasic"]),
         ]
 )

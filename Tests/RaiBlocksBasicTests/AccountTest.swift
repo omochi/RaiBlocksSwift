@@ -6,7 +6,7 @@
 //
 
 import XCTest
-import Basic
+import RaiBlocksBasic
 
 class AccountTest: XCTestCase {
     func testAccountAddress() throws {

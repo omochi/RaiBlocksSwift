@@ -6,7 +6,7 @@
 //
 
 import XCTest
-import Basic
+import RaiBlocksBasic
 import BigInt
 
 class BlockTests: XCTestCase {

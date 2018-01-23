@@ -1,5 +1,5 @@
 import XCTest
-@testable import Basic
+import RaiBlocksBasic
 
 import Foundation
 import BigInt

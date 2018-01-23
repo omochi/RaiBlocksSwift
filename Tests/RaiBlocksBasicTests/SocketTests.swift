@@ -6,7 +6,7 @@
 //
 
 import XCTest
-import Basic
+import RaiBlocksBasic
 
 class SocketTests: XCTestCase {
     

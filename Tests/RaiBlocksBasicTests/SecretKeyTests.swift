@@ -1,5 +1,5 @@
 import XCTest
-import Basic
+import RaiBlocksBasic
 
 class SecretKeyTests: XCTestCase {
     func testGenerateAddress() throws {
