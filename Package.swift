@@ -17,7 +17,7 @@ let package = Package(
         .target(name: "BLAKE2", dependencies: []),
         .target(name: "ED25519Donna", dependencies: ["BLAKE2", "RaiBlocksCRandom"]),
         .target(name: "RaiBlocksBasic",
-                dependencies: ["BLAKE2", "ED25519Donna", "BigInt"]),
+                dependencies: ["RaiBlocksCRandom", "BLAKE2", "ED25519Donna", "BigInt"]),
         .target(name: "RaiBlocksNode", dependencies: ["RaiBlocksBasic"]),
         .testTarget(name: "RaiBlocksBasicTests", dependencies: ["RaiBlocksBasic"]),
         .testTarget(name: "RaiBlocksNodeTests", dependencies: ["RaiBlocksNode"])

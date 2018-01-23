@@ -60,7 +60,7 @@ class SocketTests: XCTestCase {
         }
         
         func receive() {
-            socket.receive(maxSize: 1024,
+            socket.receive(maxSize: 32,
                            successHandler: { data in
                             if data.count == 0 {
                                 exp.fulfill()
@@ -76,6 +76,61 @@ class SocketTests: XCTestCase {
         }
         
         wait(for: [exp], timeout: 10.0)
+    }
+    
+    func testWriteRead2() throws {
+        let exp = self.expectation(description: "")
+        let socket: TCPSocket = try TCPSocket.init(callbackQueue: .main)
+        var response = Data.init()
+        
+        socket.connect(protocolFamily: .ipv4,
+                       hostname: "jprs.jp", port: 80,
+                       successHandler: {
+                        send()
+        },
+                       errorHandler: {
+                        XCTFail(String(describing: $0))
+                        exp.fulfill()
+        })
+
+        
+        func send() {
+            let request: String = [
+                "GET / HTTP/1.1",
+                "Host: jprs.jp",
+                "User-Agent: SocketTest",
+                "Accept: */*",
+                "Connection: close",
+                "", ""].joined(separator: "\r\n")
+            
+            socket.send(data: request.data(using: .utf8)!,
+                        successHandler: {
+                            receive()
+            },
+                        errorHandler: { error in
+                            XCTFail(String(describing: error))
+                            exp.fulfill()
+            })
+        }
+        
+        func receive() {
+            socket.receive(maxSize: 32,
+                           successHandler: { data in
+                            if data.count == 0 {
+                                exp.fulfill()
+                            } else {
+                                response.append(data)
+                                receive()
+                            }
+            },
+                           errorHandler: { error in
+                            XCTFail(String(describing: error))
+                            exp.fulfill()
+            })
+        }
+        
+        wait(for: [exp], timeout: 10.0)
+//        print(String(data: response, encoding: .utf8)!)
     }
     
     func testListen1() throws {

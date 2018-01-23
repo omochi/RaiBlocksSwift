@@ -11,28 +11,26 @@ public class NameResolveTask {
     public init(protocolFamily: SocketProtocolFamily,
                 hostname: String,
                 callbackQueue: DispatchQueue,
-                resultHandler: @escaping ([SocketEndPoint]) -> Void)
+                successHandler: @escaping ([SocketEndPoint]) -> Void,
+                errorHandler: @escaping (Error) -> Void)
     {
-        self.queue = DispatchQueue.init(label: "NameResolveTask")
+        self.queue = DispatchQueue.init(label: "NameResolveTask.queue")
+        self.callbackQueue = callbackQueue
         self.terminated = false
         
         weak var wself = self
         
         DispatchQueue.global().async {
-            let result = nameResolveSync(protocolFamily: protocolFamily,
-                                         hostname: hostname)
-            
-            callbackQueue.async {
-                guard let sself = wself else {
-                    return
+            do {
+                let result = try nameResolveSync(protocolFamily: protocolFamily,
+                                                 hostname: hostname)
+                wself?.postCallback {
+                    successHandler(result)
                 }
-                
-                let terminated = sself.queue.sync { sself.terminated }
-                if terminated {
-                    return
+            } catch let error {
+                wself?.postCallback {
+                    errorHandler(error)
                 }
-                
-                resultHandler(result)
             }
         }
     }
@@ -47,7 +45,23 @@ public class NameResolveTask {
         }
     }
     
+    private func postCallback(_ f: @escaping () -> Void) {
+        weak var wself = self
+        
+        callbackQueue.async {
+            guard let sself = wself else { return }
+            
+            let terminated = sself.queue.sync { sself.terminated }
+            if terminated {
+                return
+            }
+
+            f()
+        }
+    }
+    
     private let queue: DispatchQueue
+    private let callbackQueue: DispatchQueue
     private var terminated: Bool
     
 }
@@ -55,17 +69,21 @@ public class NameResolveTask {
 public func nameResolve(protocolFamily: SocketProtocolFamily,
                         hostname: String,
                         callbackQueue: DispatchQueue,
-                        resultHandler: @escaping ([SocketEndPoint]) -> Void)
+                        successHandler: @escaping ([SocketEndPoint]) -> Void,
+                        errorHandler: @escaping (Error) -> Void)
     -> NameResolveTask
 {
     return NameResolveTask.init(protocolFamily: protocolFamily,
                                 hostname: hostname,
                                 callbackQueue: callbackQueue,
-                                resultHandler: resultHandler)
+                                successHandler: successHandler,
+                                errorHandler: errorHandler)
 }
 
 private func nameResolveSync(protocolFamily: SocketProtocolFamily,
-                             hostname: String) -> [SocketEndPoint] {
+                             hostname: String)
+    throws -> [SocketEndPoint]
+{
     var hint: addrinfo = .init()
     hint.ai_family = protocolFamily.value
     hint.ai_protocol = IPPROTO_TCP
@@ -77,8 +95,11 @@ private func nameResolveSync(protocolFamily: SocketProtocolFamily,
     }
     
     var firstAddrinfo: UnsafeMutablePointer<addrinfo>? = nil
-    let ret = getaddrinfo(hostname, nil, &hint, &firstAddrinfo)
-    assert(ret == 0)
+    let st = getaddrinfo(hostname, nil, &hint, &firstAddrinfo)
+    if st != 0 {
+        let message = String.init(cString: gai_strerror(st))
+        throw GenericError.init(message: "getaddrinfo(\(hostname)): \(message)")
+    }
     
     var result: [SocketEndPoint] = []
     

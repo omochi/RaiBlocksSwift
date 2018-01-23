@@ -1,5 +1,5 @@
 import Foundation
-import CRandom
+import RaiBlocksCRandom
 import ED25519Donna
 
 public struct SecretKey {

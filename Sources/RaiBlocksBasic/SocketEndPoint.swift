@@ -6,6 +6,29 @@ public enum SocketEndPoint {
 }
 
 extension SocketEndPoint {
+    public var port: Int {
+        get {
+            switch self {
+            case .ipv6(let ep):
+                return ep.port
+            case .ipv4(let ep):
+                return ep.port
+            }
+        }
+        set {
+            switch self {
+            case .ipv6(var ep):
+                ep.port = newValue
+                self = .ipv6(ep)
+            case .ipv4(var ep):
+                ep.port = newValue
+                self = .ipv4(ep)
+            }
+        }
+    }
+}
+
+extension SocketEndPoint {
     public var protocolFamily: SocketProtocolFamily {
         switch self {
         case .ipv6:

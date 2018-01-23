@@ -21,6 +21,19 @@ public class TCPSocket {
         impl.close()
     }
     
+    public func connect(protocolFamily: SocketProtocolFamily,
+                        hostname: String,
+                        port: Int,
+                        successHandler: @escaping () -> Void,
+                        errorHandler: @escaping (Error) -> Void)
+    {
+        impl.connect(protocolFamily: protocolFamily,
+                     hostname: hostname,
+                     port: port,
+                     successHandler: successHandler,
+                     errorHandler: errorHandler)
+    }
+    
     public func connect(endPoint: SocketEndPoint,
                         successHandler: @escaping () -> Void,
                         errorHandler: @escaping (Error) -> Void)
@@ -83,43 +96,66 @@ public class TCPSocket {
             }
         }
         
+        public func connect(protocolFamily: SocketProtocolFamily,
+                            hostname: String,
+                            port: Int,
+                            successHandler: @escaping () -> Void,
+                            errorHandler: @escaping (Error) -> Void)
+        {
+            queue.sync {
+                precondition(state == .inited)
+                precondition(connectTask == nil)
+                
+                weak var wself = self
+                
+                var task: ConnectTask?
+                
+                let nameTask = nameResolve(protocolFamily: protocolFamily,
+                                           hostname: hostname,
+                                           callbackQueue: queue,
+                                           successHandler: {
+                                            resolveHandler(endPoints: $0) },
+                                           errorHandler: { error in
+                                            wself?.doError(error: error,
+                                                           callbackHandler: errorHandler) }
+                )
+                task = ConnectTask.init(nameResolveTask: nameTask,
+                                        successHandler: successHandler,
+                                        errorHandler: errorHandler)
+                self.connectTask = task
+                state = .connecting
+                
+                func resolveHandler(endPoints: [SocketEndPoint]) {
+                    guard let sself = wself else { return }
+                    let task = task!
+                    guard sself.connectTask === task else { return }
+                    
+                    do {
+                        guard var endPoint = endPoints.getRandom() else {
+                            throw GenericError.init(message: "name resolve failed, no entry: hostname=\(hostname)")
+                        }
+                        endPoint.port = port
+                        try sself._connect(endPoint: endPoint,
+                                           successHandler: task.successHandler,
+                                           errorHandler: task.errorHandler)
+                    } catch let error {
+                        sself.doError(error: error, callbackHandler: task.errorHandler)
+                    }
+                }
+            }
+        }
+        
         public func connect(endPoint: SocketEndPoint,
                             successHandler: @escaping () -> Void,
                             errorHandler: @escaping (Error) -> Void)
         {
-            func body() throws {
-                precondition(state == .inited)
-                
-                let socket = try initSocket(protocolFamily: endPoint.protocolFamily, type: SOCK_STREAM)
-                assert(socket.writeSuspended)
-                
-                let st = socket.connect(endPoint: endPoint)
-                if st != 0 {
-                    if errno != EINPROGRESS {
-                        throw PosixError.init(errno: errno, message: "connect(\(endPoint))")
-                    }
-                }
-                
-                socket.resumeWrite()
-                
-                let timer = DispatchSource.makeTimerSource(flags: [], queue: queue)
-                timer.schedule(deadline: .now() + connectTimeoutInterval)
-                timer.setEventHandler {
-                    self.doError(error: GenericError.init(message: "connect(\(endPoint)) timeout"),
-                                 callbackHandler: errorHandler)
-                }
-                timer.resume()
-                let task = ConnectTask.init(endPoint: endPoint,
-                                            timer: timer,
-                                            successHandler: successHandler,
-                                            errorHandler: errorHandler)
-                connectTask = task
-                state = .connecting
-            }
-            
             queue.sync {
                 do {
-                    try body()
+                    precondition(state == .inited)
+                    precondition(connectTask == nil)
+                    try _connect(endPoint: endPoint,
+                                 successHandler: successHandler,
+                                 errorHandler: errorHandler)
                 } catch let error {
                     self.doError(error: error, callbackHandler: errorHandler)
                 }
@@ -260,7 +296,7 @@ public class TCPSocket {
         }
         
         private func initSocket(_ socket: RawDispatchSocket) {
-            assert(state == .inited)
+            assert(state == .inited || state == .connecting)
             assert(self.socket == nil)
             
             self.socket = socket
@@ -288,6 +324,36 @@ public class TCPSocket {
             }
         }
 
+        private func _connect(endPoint: SocketEndPoint,
+                              successHandler: @escaping () -> Void,
+                              errorHandler: @escaping (Error) -> Void) throws {
+            let socket = try initSocket(protocolFamily: endPoint.protocolFamily, type: SOCK_STREAM)
+            assert(socket.writeSuspended)
+            
+            let st = socket.connect(endPoint: endPoint)
+            if st != 0 {
+                if errno != EINPROGRESS {
+                    throw PosixError.init(errno: errno, message: "connect(\(endPoint))")
+                }
+            }
+            
+            socket.resumeWrite()
+            
+            let timer = DispatchSource.makeTimerSource(flags: [], queue: queue)
+            timer.schedule(deadline: .now() + connectTimeoutInterval)
+            timer.setEventHandler {
+                self.doError(error: GenericError.init(message: "connect(\(endPoint)) timeout"),
+                             callbackHandler: errorHandler)
+            }
+            timer.resume()
+            let task = ConnectTask.init(endPoint: endPoint,
+                                        timer: timer,
+                                        successHandler: successHandler,
+                                        errorHandler: errorHandler)
+            connectTask = task
+            state = .connecting
+        }
+        
         private func doConnectSuccess() {
             assert(state == .connecting)
             
@@ -487,16 +553,29 @@ public class TCPSocket {
     }
     
     private class ConnectTask {
-        public let endPoint: SocketEndPoint
-        public let timer: DispatchSourceTimer
+        public let nameResolveTask: NameResolveTask?
+        public let endPoint: SocketEndPoint?
+        public let timer: DispatchSourceTimer?
         public let successHandler: () -> Void
         public let errorHandler: (Error) -> Void
-
+        
+        public init(nameResolveTask: NameResolveTask,
+                    successHandler: @escaping () -> Void,
+                    errorHandler: @escaping (Error) -> Void)
+        {
+            self.nameResolveTask = nameResolveTask
+            self.endPoint = nil
+            self.timer = nil
+            self.successHandler = successHandler
+            self.errorHandler = errorHandler
+        }
+        
         public init(endPoint: SocketEndPoint,
                     timer: DispatchSourceTimer,
                     successHandler: @escaping () -> Void,
                     errorHandler: @escaping (Error) -> Void)
         {
+            self.nameResolveTask = nil
             self.endPoint = endPoint
             self.timer = timer
             self.successHandler = successHandler
@@ -504,7 +583,8 @@ public class TCPSocket {
         }
         
         public func close() {
-            timer.cancel()
+            nameResolveTask?.terminate()
+            timer?.cancel()
         }
     }
     

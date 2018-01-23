@@ -1,5 +1,5 @@
 import Foundation
-import CRandom
+import RaiBlocksCRandom
 
 public struct Work {
     public init(_ value: UInt64) {
@@ -33,13 +33,6 @@ extension Work {
 
 extension Work {
     public static func generateRandom() -> Work {
-        var data = Data.init(count: 8)
-        data.withUnsafeMutableBytes { p in
-            crandom_buf(p, data.count)
-        }
-        let value = data.withUnsafeBytes { (p: UnsafePointer<UInt64>) in
-            p.pointee
-        }
-        return Work(value)
+        return Work(Random.getUInt64())
     }
 }

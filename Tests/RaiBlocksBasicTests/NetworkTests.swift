@@ -15,7 +15,7 @@ class NetworkTests: XCTestCase {
         let task = nameResolve(protocolFamily: .ipv4,
                                hostname: "raiblocks.net",
                                callbackQueue: .main,
-                               resultHandler: { (addresses) in
+                               successHandler: { (addresses) in
                                 XCTAssertTrue(addresses.contains { address in
                                     switch address {
                                     case .ipv4(let ep):
@@ -33,6 +33,10 @@ class NetworkTests: XCTestCase {
                                     }
                                 })
                                 exp.fulfill()
+        },
+                               errorHandler: { error in
+                                XCTFail(String(describing: error))
+                                exp.fulfill()
         })
         let _ = task
         wait(for: [exp], timeout: 10.0)
@@ -44,8 +48,11 @@ class NetworkTests: XCTestCase {
         let task = nameResolve(protocolFamily: .ipv4,
                                hostname: "raiblocks.net",
                                callbackQueue: .main,
-                               resultHandler: { (addresses) in
+                               successHandler: { (addresses) in
                                 XCTFail()
+        },
+                               errorHandler: { error in
+                                XCTFail(String(describing: error))
         })
         task.terminate()
         DispatchQueue.global().asyncAfter(deadline: DispatchTime.now() + 1.0) {

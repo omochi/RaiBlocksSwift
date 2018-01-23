@@ -1,4 +1,4 @@
-module CRandom {
+module RaiBlocksCRandom {
 	header "crandom.h"
 	export *
 }
