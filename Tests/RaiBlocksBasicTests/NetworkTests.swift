@@ -60,6 +60,30 @@ class NetworkTests: XCTestCase {
         }
         wait(for: [exp], timeout: 10.0)
     }
+    
+    func testNameResolve2() {
+        let exp = self.expectation(description: "")
+        let task = nameResolve(protocolFamily: .ipv4,
+                               hostname: "117.104.133.164",
+                               callbackQueue: .main,
+                               successHandler: { (addresses) in
+                                XCTAssertTrue(addresses.contains { address in
+                                    switch address {
+                                    case .ipv4(let ep):
+                                        return ep.address == IPv4.Address(string: "117.104.133.164")!
+                                    default:
+                                        return false
+                                    }
+                                })
+                                exp.fulfill()
+        },
+                               errorHandler: { error in
+                                XCTFail(String(describing: error))
+                                exp.fulfill()
+        })
+        let _ = task
+        wait(for: [exp], timeout: 10.0)
+    }
 
 
 }

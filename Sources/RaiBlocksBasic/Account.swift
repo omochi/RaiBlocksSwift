@@ -9,6 +9,10 @@ public class Account : CustomStringConvertible {
             self._data = data
         }
         
+        public init() {
+            self.init(data: Data.init(count: Address.size))
+        }
+        
         public func asData() -> Data {
             return _data
         }

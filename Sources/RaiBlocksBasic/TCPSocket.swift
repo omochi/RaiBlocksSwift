@@ -1,10 +1,3 @@
-//
-//  TCPSocket.swift
-//  Basic
-//
-//  Created by omochimetaru on 2018/01/22.
-//
-
 import Foundation
 
 public class TCPSocket {
@@ -106,8 +99,6 @@ public class TCPSocket {
                 precondition(state == .inited)
                 precondition(connectTask == nil)
                 
-                weak var wself = self
-                
                 var task: ConnectTask?
                 
                 let nameTask = nameResolve(protocolFamily: protocolFamily,
@@ -116,8 +107,8 @@ public class TCPSocket {
                                            successHandler: {
                                             resolveHandler(endPoints: $0) },
                                            errorHandler: { error in
-                                            wself?.doError(error: error,
-                                                           callbackHandler: errorHandler) }
+                                            self.doError(error: error,
+                                                         callbackHandler: errorHandler) }
                 )
                 task = ConnectTask.init(nameResolveTask: nameTask,
                                         successHandler: successHandler,
@@ -126,20 +117,19 @@ public class TCPSocket {
                 state = .connecting
                 
                 func resolveHandler(endPoints: [SocketEndPoint]) {
-                    guard let sself = wself else { return }
                     let task = task!
-                    guard sself.connectTask === task else { return }
+                    guard self.connectTask === task else { return }
                     
                     do {
                         guard var endPoint = endPoints.getRandom() else {
                             throw GenericError.init(message: "name resolve failed, no entry: hostname=\(hostname)")
                         }
                         endPoint.port = port
-                        try sself._connect(endPoint: endPoint,
-                                           successHandler: task.successHandler,
-                                           errorHandler: task.errorHandler)
+                        try self._connect(endPoint: endPoint,
+                                          successHandler: task.successHandler,
+                                          errorHandler: task.errorHandler)
                     } catch let error {
-                        sself.doError(error: error, callbackHandler: task.errorHandler)
+                        self.doError(error: error, callbackHandler: task.errorHandler)
                     }
                 }
             }
@@ -251,7 +241,7 @@ public class TCPSocket {
                     try body()
                 } catch let error {
                     _close()
-                    state = .error
+                    state = .closed
                     throw error
                 }
             }
@@ -368,23 +358,6 @@ public class TCPSocket {
             
             postCallback {
                 task.successHandler()
-            }
-        }
-        
-        private func doConnectError(error: Error) {
-            assert(state == .connecting)
-            
-            let task = connectTask!
-            doError(error: error, callbackHandler: task.errorHandler)
-        }
-        
-        private func doError(error: Error,
-                             callbackHandler: @escaping (Error) -> Void)
-        {
-            _close()
-            state = .error
-            postCallback {
-                callbackHandler(error)
             }
         }
         
@@ -519,12 +492,27 @@ public class TCPSocket {
             }
         }
         
+        private func doError(error: Error,
+                             callbackHandler: @escaping (Error) -> Void)
+        {
+            _close()
+            postCallback {
+                self.queue.sync {
+                    self.state = .closed
+                }
+                
+                callbackHandler(error)
+            }
+        }
+        
         private func postCallback(_ f: @escaping () -> Void) {
             callbackQueue.async {
-                let closed = self.queue.sync { self.state == .closed }
-                if closed {
-                    return
-                }
+                guard (self.queue.sync {
+                    if self.state == .closed {
+                        return false
+                    }
+                    return true
+                }) else { return }
                 
                 f()
             }
@@ -549,7 +537,6 @@ public class TCPSocket {
         case connected
         case listening
         case closed
-        case error
     }
     
     private class ConnectTask {

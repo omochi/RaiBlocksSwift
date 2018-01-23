@@ -14,4 +14,13 @@ public enum Block {
         
         private let _data: Data
     }
+    
+    public enum Kind : UInt8 {
+        case invalid = 0
+        case notABlock
+        case send
+        case receive
+        case open
+        case change
+    }
 }

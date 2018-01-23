@@ -28,6 +28,17 @@ extension SocketEndPoint {
     }
 }
 
+extension SocketEndPoint : CustomStringConvertible {
+    public var description: String {
+        switch self {
+        case .ipv6(let ep):
+            return ep.description
+        case .ipv4(let ep):
+            return ep.description
+        }
+    }
+}
+
 extension SocketEndPoint {
     public var protocolFamily: SocketProtocolFamily {
         switch self {
