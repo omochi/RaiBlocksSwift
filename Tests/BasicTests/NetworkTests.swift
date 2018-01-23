@@ -12,22 +12,40 @@ class NetworkTests: XCTestCase {
 
     func testNameResolve1() {
         let exp = self.expectation(description: "")
-        nameResolve(hostname: "raiblocks.net",
-                    callbackQueue: .main,
-                    resultHandler: { (addresses) in
-                        XCTAssertTrue(addresses.contains { $0 == IPv6.Address(string: "2400:cb00:2048:1:0:0:681f:45b9")! })
-                        XCTAssertTrue(addresses.contains { $0 == IPv6.Address(string: "2400:cb00:2048:1:0:0:681f:44b9")! })
-                        exp.fulfill()
+        let task = nameResolve(protocolFamily: .ipv4,
+                               hostname: "raiblocks.net",
+                               callbackQueue: .main,
+                               resultHandler: { (addresses) in
+                                XCTAssertTrue(addresses.contains { address in
+                                    switch address {
+                                    case .ipv4(let ep):
+                                        return ep.address == IPv4.Address(string: "104.31.68.185")!
+                                    default:
+                                        return false
+                                    }
+                                })
+                                XCTAssertTrue(addresses.contains { address in
+                                    switch address {
+                                    case .ipv4(let ep):
+                                        return ep.address == IPv4.Address(string: "104.31.69.185")!
+                                    default:
+                                        return false
+                                    }
+                                })
+                                exp.fulfill()
         })
+        let _ = task
         wait(for: [exp], timeout: 10.0)
+
     }
     
     func testNameResolveCancel1() {
         let exp = self.expectation(description: "")
-        let task = nameResolve(hostname: "raiblocks.net",
-                    callbackQueue: .main,
-                    resultHandler: { (addresses) in
-                        XCTFail()
+        let task = nameResolve(protocolFamily: .ipv4,
+                               hostname: "raiblocks.net",
+                               callbackQueue: .main,
+                               resultHandler: { (addresses) in
+                                XCTFail()
         })
         task.terminate()
         DispatchQueue.global().asyncAfter(deadline: DispatchTime.now() + 1.0) {

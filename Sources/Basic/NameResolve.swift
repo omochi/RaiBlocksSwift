@@ -8,9 +8,10 @@
 import Foundation
 
 public class NameResolveTask {
-    public init(hostname: String,
+    public init(protocolFamily: SocketProtocolFamily,
+                hostname: String,
                 callbackQueue: DispatchQueue,
-                resultHandler: @escaping ([IPv6.Address]) -> Void)
+                resultHandler: @escaping ([SocketEndPoint]) -> Void)
     {
         self.queue = DispatchQueue.init(label: "NameResolveTask")
         self.terminated = false
@@ -18,7 +19,8 @@ public class NameResolveTask {
         weak var wself = self
         
         DispatchQueue.global().async {
-            let result = nameResolveSync(hostname: hostname)
+            let result = nameResolveSync(protocolFamily: protocolFamily,
+                                         hostname: hostname)
             
             callbackQueue.async {
                 guard let sself = wself else {
@@ -35,6 +37,10 @@ public class NameResolveTask {
         }
     }
     
+    deinit {
+        terminate()
+    }
+    
     public func terminate() {
         queue.sync {
             self.terminated = true
@@ -46,38 +52,44 @@ public class NameResolveTask {
     
 }
 
-@discardableResult
-public func nameResolve(hostname: String,
+public func nameResolve(protocolFamily: SocketProtocolFamily,
+                        hostname: String,
                         callbackQueue: DispatchQueue,
-                        resultHandler: @escaping ([IPv6.Address]) -> Void)
+                        resultHandler: @escaping ([SocketEndPoint]) -> Void)
     -> NameResolveTask
 {
-    return NameResolveTask.init(hostname: hostname,
+    return NameResolveTask.init(protocolFamily: protocolFamily,
+                                hostname: hostname,
                                 callbackQueue: callbackQueue,
                                 resultHandler: resultHandler)
 }
 
-private func nameResolveSync(hostname: String) -> [IPv6.Address] {
+private func nameResolveSync(protocolFamily: SocketProtocolFamily,
+                             hostname: String) -> [SocketEndPoint] {
     var hint: addrinfo = .init()
-    hint.ai_flags = AI_V4MAPPED
-    hint.ai_family = PF_INET6
+    hint.ai_family = protocolFamily.value
     hint.ai_protocol = IPPROTO_TCP
+    switch protocolFamily {
+    case .ipv6:
+        hint.ai_flags = AI_V4MAPPED
+    default:
+        break
+    }
     
     var firstAddrinfo: UnsafeMutablePointer<addrinfo>? = nil
     let ret = getaddrinfo(hostname, nil, &hint, &firstAddrinfo)
     assert(ret == 0)
     
-    var result: [IPv6.Address] = []
+    var result: [SocketEndPoint] = []
     
     var addrinfoOpt = firstAddrinfo
     while let addrinfo = addrinfoOpt {
-        if addrinfo.pointee.ai_family == PF_INET6 {
-            addrinfo.pointee.ai_addr!.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) { addr in
-                let address = IPv6.Address.init(addr: addr.pointee.sin6_addr)
-                result.append(address)
-            }
+        if let pf = SocketProtocolFamily(value: addrinfo.pointee.ai_family) {
+            let endPoint = SocketEndPoint.init(protocolFamily: pf,
+                                               sockAddr: addrinfo.pointee.ai_addr)
+            result.append(endPoint)
         }
-        
+
         addrinfoOpt = addrinfo.pointee.ai_next
     }
     freeaddrinfo(firstAddrinfo)

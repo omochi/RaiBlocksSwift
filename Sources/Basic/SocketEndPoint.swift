@@ -15,6 +15,19 @@ extension SocketEndPoint {
         }
     }
     
+    public init(protocolFamily: SocketProtocolFamily,
+                sockAddr: UnsafePointer<sockaddr>)
+    {
+        switch protocolFamily {
+        case .ipv6:
+            let sockAddr = sockAddr.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) { $0.pointee }
+            self = .ipv6(IPv6.EndPoint(sockAddr: sockAddr))
+        case .ipv4:
+            let sockAddr = sockAddr.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee }
+            self = .ipv4(IPv4.EndPoint(sockAddr: sockAddr))
+        }
+    }
+    
     public func withSockAddrPointer<R>(_ f: (UnsafePointer<sockaddr>, Int) throws -> R) rethrows -> R {
         switch self {
         case .ipv6(let ep):

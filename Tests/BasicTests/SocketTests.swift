@@ -60,13 +60,14 @@ class SocketTests: XCTestCase {
         }
         
         func receive() {
-            socket.receive(successHandler: { data in
-                if data.count == 0 {
-                    exp.fulfill()
-                } else {
-                    response.append(data)
-                    receive()
-                }
+            socket.receive(maxSize: 1024,
+                           successHandler: { data in
+                            if data.count == 0 {
+                                exp.fulfill()
+                            } else {
+                                response.append(data)
+                                receive()
+                            }
             },
                            errorHandler: { error in
                             XCTFail(String(describing: error))
@@ -107,10 +108,11 @@ class SocketTests: XCTestCase {
         clientSocket.connect(endPoint: .ipv4(IPv4.EndPoint(address: IPv4.Address(string: "127.0.0.1")!,
                                                            port: 4567)),
                              successHandler: { 
-                                clientSocket.receive(successHandler: { data in
-                                    let str = String.init(data: data, encoding: .utf8)!
-                                    XCTAssertEqual(str, "hello client")
-                                    exp2.fulfill()
+                                clientSocket.receive(maxSize: 1024,
+                                                     successHandler: { data in
+                                                        let str = String.init(data: data, encoding: .utf8)!
+                                                        XCTAssertEqual(str, "hello client")
+                                                        exp2.fulfill()
                                 },
                                                      errorHandler: { error in
                                                         XCTFail(String(describing: error))

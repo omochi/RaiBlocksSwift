@@ -39,10 +39,12 @@ public class TCPSocket {
                   errorHandler: errorHandler)
     }
     
-    public func receive(successHandler: @escaping (Data) -> Void,
+    public func receive(maxSize: Int,
+                        successHandler: @escaping (Data) -> Void,
                         errorHandler: @escaping (Error) -> Void)
     {
-        impl.receive(successHandler: successHandler,
+        impl.receive(maxSize: maxSize,
+                     successHandler: successHandler,
                      errorHandler: errorHandler)
     }
     public func listen(protocolFamily: SocketProtocolFamily, port: Int, backlog: Int = 8) throws {
@@ -144,7 +146,8 @@ public class TCPSocket {
             }
         }
         
-        public func receive(successHandler: @escaping (Data) -> Void,
+        public func receive(maxSize: Int,
+                            successHandler: @escaping (Data) -> Void,
                             errorHandler: @escaping (Error) -> Void)
         {
             queue.sync {
@@ -156,7 +159,8 @@ public class TCPSocket {
                 
                 socket.resumeRead()
                 
-                let task = ReceiveTask.init(successHandler: successHandler,
+                let task = ReceiveTask.init(maxSize: maxSize,
+                                            successHandler: successHandler,
                                             errorHandler: errorHandler)
                 receiveTask = task
             }
@@ -378,7 +382,12 @@ public class TCPSocket {
                 var data = Data.init()
                 
                 while true {
-                    var chunk = Data.init(count: 1024)
+                    assert(data.count <= task.maxSize)
+                    if data.count == task.maxSize {
+                        break
+                    }
+                    
+                    var chunk = Data.init(count: task.maxSize - data.count)
                     let st = chunk.withUnsafeMutableBytes { p in
                         socket.recv(data: p, size: chunk.count)
                     }
@@ -391,7 +400,6 @@ public class TCPSocket {
                     } else if st == 0 {
                         break
                     }
-                    
                     chunk.count = st
                     data.append(chunk)
                 }
@@ -518,12 +526,15 @@ public class TCPSocket {
     }
     
     private class ReceiveTask {
+        public var maxSize: Int
         public var successHandler: (Data) -> Void
         public var errorHandler: (Error) -> Void
         
-        public init(successHandler: @escaping (Data) -> Void,
+        public init(maxSize: Int,
+                    successHandler: @escaping (Data) -> Void,
                     errorHandler: @escaping (Error) -> Void)
         {
+            self.maxSize = maxSize
             self.successHandler = successHandler
             self.errorHandler = errorHandler
         }
