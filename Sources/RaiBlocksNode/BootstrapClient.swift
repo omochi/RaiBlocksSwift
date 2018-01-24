@@ -31,8 +31,8 @@ public class BootstrapClient {
                                hostname: hostname,
                                port: port,
                                successHandler: {
-                                wself?.postCallback { _ in
-                                    successHandler()
+                                wself?.postCallback { `self` in
+                                    return { successHandler() }
                                 }
                 },
                                errorHandler: { (error) in
@@ -84,11 +84,14 @@ public class BootstrapClient {
                          successHandler: { data in
                             do {
                                 let entry = try Message.AccountResponseEntry.init(from: data)
-                                wself?.postCallback { _ in
-                                    if entry.account == Account.Address() {
-                                        entryHandler(entry, nextEnd)
-                                    } else {
-                                        entryHandler(entry, next)
+                                
+                                wself?.postCallback { `self` in
+                                    return {
+                                        if entry.account == Account.Address() {
+                                            entryHandler(entry, nextEnd)
+                                        } else {
+                                            entryHandler(entry, next)
+                                        }
                                     }
                                 }
                             } catch let error {
@@ -102,37 +105,36 @@ public class BootstrapClient {
         _socket?.close()
         _socket = nil
     }
-    
-    private func postCallback(_ f: @escaping (BootstrapClient) -> Void) {
-        weak var wself = self
-        
-        callbackQueue.async {
-            guard let `self` = wself else { return }
-            
-            guard (self.queue.sync {
-                if self._terminated {
-                    return false
-                }
-                return true
-            }) else { return }
-            
-            f(self)
-        }
-    }
-    
+
     private func doError(_ error: Error,
                          handler: @escaping (Error) -> Void)
     {
         _terminate()
         
         postCallback { `self` in
-            self.queue.sync {
-                self._terminated = true
-            }
+            self._terminated = true
             
-            handler(error)
+            return { handler(error) }
         }
     }
+    
+    private func postCallback(_ f: @escaping (BootstrapClient) -> () -> Void) {
+        weak var wself = self
+        
+        callbackQueue.async {
+            guard let `self` = wself else { return }
+            
+            let next: () -> Void = self.queue.sync {
+                if self._terminated {
+                    return {}
+                }
+                return f(self)
+            }
+            
+            next()
+        }
+    }
+    
     
     private let queue: DispatchQueue
     private let callbackQueue: DispatchQueue

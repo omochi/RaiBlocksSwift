@@ -358,7 +358,7 @@ public class TCPSocket {
             _endPoint = task.endPoint
             
             postCallback {
-                task.successHandler()
+                return { task.successHandler() }
             }
         }
         
@@ -401,7 +401,7 @@ public class TCPSocket {
                 sendTask = nil
                 socket.suspendWrite()
                 postCallback {
-                    task.successHandler()
+                    return { task.successHandler() }
                 }
             }
             
@@ -459,7 +459,7 @@ public class TCPSocket {
                 receiveTask = nil
                 socket.suspendRead()
                 postCallback {
-                    task.successHandler(task.data)
+                    return { task.successHandler(task.data) }
                 }
             }
             
@@ -485,16 +485,17 @@ public class TCPSocket {
                     throw PosixError.init(errno: errno, message: "accept()")
                 }
                 
-                let newSocket = try Impl.init(callbackQueue: callbackQueue)
-                let _ = try newSocket.initSocket(fd: st, protocolFamily: socket.protocolFamily)
-                newSocket._endPoint = endPoint
-                newSocket.state = .connected
+                let newSocketImpl = try Impl.init(callbackQueue: callbackQueue)
+                let _ = try newSocketImpl.initSocket(fd: st, protocolFamily: socket.protocolFamily)
+                newSocketImpl._endPoint = endPoint
+                newSocketImpl.state = .connected
+                let newSocket = TCPSocket.init(impl: newSocketImpl)
                 
                 acceptTask = nil
                 socket.suspendRead()
                 
                 postCallback {
-                    task.successHandler(TCPSocket.init(impl: newSocket))
+                    return { task.successHandler(newSocket) }
                 }
             }
             
@@ -510,24 +511,22 @@ public class TCPSocket {
         {
             _close()
             postCallback {
-                self.queue.sync {
-                    self.state = .closed
+                self.state = .closed
+                return {
+                    callbackHandler(error)
                 }
-                
-                callbackHandler(error)
             }
         }
         
-        private func postCallback(_ f: @escaping () -> Void) {
+        private func postCallback(_ f: @escaping () -> () -> Void) {
             callbackQueue.async {
-                guard (self.queue.sync {
+                let next: () -> Void = self.queue.sync {
                     if self.state == .closed {
-                        return false
+                        return {}
                     }
-                    return true
-                }) else { return }
-                
-                f()
+                    return f()
+                }
+                next()
             }
         }
         
