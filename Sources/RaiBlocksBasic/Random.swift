@@ -6,6 +6,10 @@ public enum Random {
         return getValue(of: UInt.self)
     }
     
+    public static func getUInt32() -> UInt32 {
+        return getValue(of: UInt32.self)
+    }
+    
     public static func getUInt64() -> UInt64 {
         return getValue(of: UInt64.self)
     }
