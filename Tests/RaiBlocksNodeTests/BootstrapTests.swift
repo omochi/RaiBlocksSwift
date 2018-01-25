@@ -25,7 +25,7 @@ class BootstrapTests: XCTestCase {
         func connectHandler() {
             var i = 0
             client.requestAccount(entryHandler: { (entry, next) in
-                print(i, entry.account, entry.latestHash)
+                print("\(i), \(entry.account?.description ?? ""), \(entry.headBlock?.description ?? "")")
                 i += 1
                 next()
             },

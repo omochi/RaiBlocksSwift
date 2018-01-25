@@ -19,14 +19,9 @@ public func ==(a: Block.Hash, b: Block.Hash) -> Bool {
     return a.asData() == b.asData()
 }
 
-extension Block.Hash {
-    public func score(of work: Work) -> UInt64 {
-        let blake = Blake2B.init(outputSize: 8)
-        blake.update(data: work.asData())
-        blake.update(data: asData())
-        let data = blake.finalize()
-        return data.withUnsafeBytes { (p: UnsafePointer<UInt64>) in
-            return p.pointee
-        }
-    }
+extension Block.Hash : Comparable {}
+
+public func <(a: Block.Hash, b: Block.Hash) -> Bool {
+    return a.asData().lexicographicallyPrecedes(b.asData())
 }
+

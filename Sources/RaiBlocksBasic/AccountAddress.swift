@@ -9,7 +9,7 @@ extension Account.Address {
 
     public init(bigUInt: BigUInt) {
         precondition(bigUInt.bitWidth <= 256)
-        self.init(data: bigUInt.asData(size: 32))
+        self.init(data: bigUInt.asData(size: Account.Address.size))
     }
 }
 
@@ -152,11 +152,11 @@ extension Account.Address {
 extension Account.Address : Equatable {}
 
 public func ==(a: Account.Address, b: Account.Address) -> Bool {
-    return a.asBigUInt() == b.asBigUInt()
+    return a.asData() == b.asData()
 }
 
 extension Account.Address : Comparable {}
 
 public func <(a: Account.Address, b: Account.Address) -> Bool {
-    return a.asBigUInt() < b.asBigUInt()
+    return a.asData().lexicographicallyPrecedes(b.asData())
 }

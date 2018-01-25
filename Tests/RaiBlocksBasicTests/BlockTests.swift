@@ -26,9 +26,9 @@ class BlockTests: XCTestCase {
     }
     
     func testSendBlockHash2() {
-        let block = SendBlock.init(previous: Block.Hash(hexString: "D7E659B9C448B241157BECA5DDA1B4F451555AE16149D161013C028DC36800A9"),
-                                   destination: try! Account.Address(string: "xrb_3d69nxbox9qiokkxduazombodwj73mpegrbne1dq1884d37iodtbwnqr163p"),
-                                   balance: Amount(4459900, unit: .rai))
+        let block = Block.Send(previous: Block.Hash(hexString: "D7E659B9C448B241157BECA5DDA1B4F451555AE16149D161013C028DC36800A9"),
+                               destination: try! Account.Address(string: "xrb_3d69nxbox9qiokkxduazombodwj73mpegrbne1dq1884d37iodtbwnqr163p"),
+                               balance: Amount(4459900, unit: .rai))
         let hash = block.hash
         
         XCTAssertEqual(hash,
@@ -36,10 +36,10 @@ class BlockTests: XCTestCase {
     }
     
     func testSendBlockSignature() {
-        let block = SendBlock.init(previous: Block.Hash(hexString: "D7E659B9C448B241157BECA5DDA1B4F451555AE16149D161013C028DC36800A9"),
-                                   destination: try! Account.Address(string: "xrb_3d69nxbox9qiokkxduazombodwj73mpegrbne1dq1884d37iodtbwnqr163p"),
-                                   balance: Amount(4459900, unit: .rai),
-                                   signature: Signature(hexString: "CB49AD73271DA6C58ADFCD74A2F254DBF5CB58E50E1DA0DECA4796F446D73E894EEDFE01E77D8858A3F2BD8796AE8CAF018FAAB8CA2E96867088E7E1AE192B08"))
+        let block = Block.Send(previous: Block.Hash(hexString: "D7E659B9C448B241157BECA5DDA1B4F451555AE16149D161013C028DC36800A9"),
+                               destination: try! Account.Address(string: "xrb_3d69nxbox9qiokkxduazombodwj73mpegrbne1dq1884d37iodtbwnqr163p"),
+                               balance: Amount(4459900, unit: .rai),
+                               signature: Signature(hexString: "CB49AD73271DA6C58ADFCD74A2F254DBF5CB58E50E1DA0DECA4796F446D73E894EEDFE01E77D8858A3F2BD8796AE8CAF018FAAB8CA2E96867088E7E1AE192B08"))
         
         let address = try! Account.Address(string: "xrb_151kndxz7cjx5ygem9am7m8wk669ingtw8dj1e6ca31gzsftj3i3oiw5p5tk")
         
@@ -63,7 +63,7 @@ class BlockTests: XCTestCase {
     func testWorkScore2() {
         let hash = Block.Hash.init(hexString: "D7E659B9C448B241157BECA5DDA1B4F451555AE16149D161013C028DC36800A9")
         let work = Work.init(0x24334bb782f6fade)
-        let score = hash.score(of: work)
+        let score = work.score(for: hash)
         XCTAssertGreaterThanOrEqual(score, 0xFFFFFFC000000000)
     }
 

@@ -87,7 +87,7 @@ public class BootstrapClient {
                                 
                                 wself?.postCallback { `self` in
                                     return {
-                                        if entry.account == Account.Address() {
+                                        if entry.account == nil {
                                             entryHandler(entry, nextEnd)
                                         } else {
                                             entryHandler(entry, next)

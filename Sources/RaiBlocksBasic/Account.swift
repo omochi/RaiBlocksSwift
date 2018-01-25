@@ -8,11 +8,7 @@ public class Account : CustomStringConvertible {
             
             self._data = data
         }
-        
-        public init() {
-            self.init(data: Data.init(count: Address.size))
-        }
-        
+
         public init(from reader: DataReader) throws {
             let data = try reader.read(Data.self, size: 32)
             self.init(data: data)
@@ -27,6 +23,8 @@ public class Account : CustomStringConvertible {
         }
         
         public static let size: Int = 32
+        
+        public static let zero: Address = .init(data: Data.init(count: size))
         
         private let _data: Data
     }

@@ -12,9 +12,7 @@ public struct Signature {
     }
     
     public static let size: Int = 64
-    
-    public static let zero: Signature = .init(data: Data.init(count: size))
-    
+        
     private let _data: Data
 }
 

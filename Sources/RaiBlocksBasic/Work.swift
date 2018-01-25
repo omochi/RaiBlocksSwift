@@ -29,6 +29,20 @@ extension Work {
         }
         return data
     }
+    
+    public func score(for hash: Block.Hash) -> UInt64 {
+        let blake = Blake2B.init(outputSize: 8)
+        blake.update(data: self.asData())
+        blake.update(data: hash.asData())
+        let data = blake.finalize()
+        return data.withUnsafeBytes { (p: UnsafePointer<UInt64>) in
+            return p.pointee
+        }
+    }
+    
+    public func verify(for hash: Block.Hash, threshold: UInt64) -> Bool {
+        return score(for: hash) >= threshold
+    }
 }
 
 extension Work {

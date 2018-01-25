@@ -133,7 +133,7 @@ public class WorkFinder {
         
         for _ in 0..<10000 {
             let work = Work.generateRandom()
-            let score = task.hash.score(of: work)
+            let score = work.score(for: task.hash)
             if let bestResult = bestResult {
                 guard bestResult.score < score else {
                     continue

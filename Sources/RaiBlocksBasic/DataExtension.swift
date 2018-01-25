@@ -45,3 +45,4 @@ extension Data {
         self = DataHexParser.shared.parse(hexString: hexString)
     }
 }
+

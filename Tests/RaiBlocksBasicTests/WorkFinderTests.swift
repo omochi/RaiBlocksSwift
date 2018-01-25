@@ -25,7 +25,7 @@ class WorkFinderTests: XCTestCase {
                     completeHandler: { work in
                         count += 1
                         XCTAssertEqual(count, 1)
-                        XCTAssertGreaterThanOrEqual(hash.score(of: work), thresh)
+                        XCTAssertGreaterThanOrEqual(work.score(for: hash), thresh)
                         exp1.fulfill()
         })
         
@@ -36,7 +36,7 @@ class WorkFinderTests: XCTestCase {
                     completeHandler: { work in
                         count += 1
                         XCTAssertEqual(count, 2)
-                        XCTAssertGreaterThanOrEqual(hash.score(of: work), thresh)
+                        XCTAssertGreaterThanOrEqual(work.score(for: hash), thresh)
                         exp2.fulfill()
         })
         
@@ -47,7 +47,7 @@ class WorkFinderTests: XCTestCase {
                     completeHandler: { work in
                         count += 1
                         XCTAssertEqual(count, 3)
-                        XCTAssertGreaterThanOrEqual(hash.score(of: work), thresh)
+                        XCTAssertGreaterThanOrEqual(work.score(for: hash), thresh)
                         exp3.fulfill()
         })
         

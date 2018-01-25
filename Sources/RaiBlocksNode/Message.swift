@@ -79,32 +79,39 @@ public enum Message {
     
     public struct AccountRequest : DataWritable {
         public var header: Header
-        public var start: Account.Address
+        public var start: Account.Address?
         public var age: UInt32
         public var count: UInt32
         
         public init() {
             self.header = .init(kind: .accountRequest)
-            self.start = .init()
+            self.start = nil
             self.age = 0
             self.count = 0
         }
         
         public func write(to writer: DataWriter) {
             writer.write(header)
-            writer.write(start)
+            writer.write(start ?? .zero)
             writer.write(NSSwapHostIntToLittle(age))
             writer.write(NSSwapHostIntToLittle(count))
         }
     }
     
     public struct AccountResponseEntry : DataReadable {
-        public var account: Account.Address
-        public var latestHash: Block.Hash
+        public var account: Account.Address?
+        public var headBlock: Block.Hash?
         
         public init(from reader: DataReader) throws {
-            account = try .init(from: reader)
-            latestHash = try .init(from: reader)
+            account = try Account.Address(from: reader)
+            if account == .zero {
+                account = nil
+            }
+            
+            headBlock = try Block.Hash(from: reader)
+            if headBlock == .zero {
+                headBlock = nil
+            }
         }
     }
 }
