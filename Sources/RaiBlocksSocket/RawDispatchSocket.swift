@@ -3,7 +3,7 @@ import RaiBlocksPosix
 
 public class RawDispatchSocket {
     public init(fd: Int32,
-                protocolFamily: SocketProtocolFamily,
+                protocolFamily: ProtocolFamily,
                 queue: DispatchQueue) throws
     {
         self.fd = fd
@@ -22,7 +22,7 @@ public class RawDispatchSocket {
         self.writeSuspended = true
     }
     
-    public convenience init(protocolFamily: SocketProtocolFamily,
+    public convenience init(protocolFamily: ProtocolFamily,
                             type: Int32,
                             queue: DispatchQueue) throws
     {
@@ -36,7 +36,7 @@ public class RawDispatchSocket {
     }
 
     public let fd: Int32
-    public let protocolFamily: SocketProtocolFamily
+    public let protocolFamily: ProtocolFamily
     public private(set) var readSuspended: Bool
     public private(set) var writeSuspended: Bool
     
@@ -59,7 +59,7 @@ public class RawDispatchSocket {
         return Darwin.setsockopt(fd, level, name, UnsafeMutablePointer<CInt>(&value), UInt32(MemoryLayout<CInt>.size))
     }
     
-    public func connect(endPoint: SocketEndPoint) -> Int32 {
+    public func connect(endPoint: EndPoint) -> Int32 {
         return endPoint.withSockAddrPointer { (p, size) in
             Darwin.connect(fd, p, UInt32(size))
         }
@@ -73,7 +73,7 @@ public class RawDispatchSocket {
         return Darwin.recv(fd, data, size, 0)
     }
     
-    public func bind(endPoint: SocketEndPoint) -> Int32 {
+    public func bind(endPoint: EndPoint) -> Int32 {
         return endPoint.withSockAddrPointer { (p, size) in
             Darwin.bind(fd, p, UInt32(size))
         }
@@ -83,8 +83,8 @@ public class RawDispatchSocket {
         return Darwin.listen(fd, Int32(backlog))
     }
     
-    public func accept() -> (Int32, SocketEndPoint) {
-        var endPoint: SocketEndPoint
+    public func accept() -> (Int32, EndPoint) {
+        var endPoint: EndPoint
         switch protocolFamily {
         case .ipv6:
             endPoint = .ipv6(.init())

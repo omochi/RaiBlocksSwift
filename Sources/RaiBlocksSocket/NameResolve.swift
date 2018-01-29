@@ -8,10 +8,10 @@
 import Foundation
 
 public class NameResolveTask {
-    public init(protocolFamily: SocketProtocolFamily,
+    public init(protocolFamily: ProtocolFamily,
                 hostname: String,
                 callbackQueue: DispatchQueue,
-                successHandler: @escaping ([SocketEndPoint]) -> Void,
+                successHandler: @escaping ([EndPoint]) -> Void,
                 errorHandler: @escaping (Error) -> Void)
     {
         self.queue = DispatchQueue.init(label: "NameResolveTask.queue")
@@ -66,10 +66,10 @@ public class NameResolveTask {
     
 }
 
-public func nameResolve(protocolFamily: SocketProtocolFamily,
+public func nameResolve(protocolFamily: ProtocolFamily,
                         hostname: String,
                         callbackQueue: DispatchQueue,
-                        successHandler: @escaping ([SocketEndPoint]) -> Void,
+                        successHandler: @escaping ([EndPoint]) -> Void,
                         errorHandler: @escaping (Error) -> Void)
     -> NameResolveTask
 {
@@ -80,9 +80,9 @@ public func nameResolve(protocolFamily: SocketProtocolFamily,
                                 errorHandler: errorHandler)
 }
 
-private func nameResolveSync(protocolFamily: SocketProtocolFamily,
+private func nameResolveSync(protocolFamily: ProtocolFamily,
                              hostname: String)
-    throws -> [SocketEndPoint]
+    throws -> [EndPoint]
 {
     var hint: addrinfo = .init()
     hint.ai_family = protocolFamily.value
@@ -101,12 +101,12 @@ private func nameResolveSync(protocolFamily: SocketProtocolFamily,
         throw SocketError.init(message: "getaddrinfo(\(hostname)): \(message)")
     }
     
-    var result: [SocketEndPoint] = []
+    var result: [EndPoint] = []
     
     var addrinfoOpt = firstAddrinfo
     while let addrinfo = addrinfoOpt {
-        if let pf = SocketProtocolFamily(value: addrinfo.pointee.ai_family) {
-            let endPoint = SocketEndPoint.init(protocolFamily: pf,
+        if let pf = ProtocolFamily(value: addrinfo.pointee.ai_family) {
+            let endPoint = EndPoint.init(protocolFamily: pf,
                                                sockAddr: addrinfo.pointee.ai_addr)
             result.append(endPoint)
         }

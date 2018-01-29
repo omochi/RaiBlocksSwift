@@ -16,7 +16,7 @@ public class TCPSocket {
         impl.close()
     }
     
-    public func connect(protocolFamily: SocketProtocolFamily,
+    public func connect(protocolFamily: ProtocolFamily,
                         hostname: String,
                         port: Int,
                         successHandler: @escaping () -> Void,
@@ -29,7 +29,7 @@ public class TCPSocket {
                      errorHandler: errorHandler)
     }
     
-    public func connect(endPoint: SocketEndPoint,
+    public func connect(endPoint: EndPoint,
                         successHandler: @escaping () -> Void,
                         errorHandler: @escaping (Error) -> Void)
     {
@@ -55,7 +55,7 @@ public class TCPSocket {
                      successHandler: successHandler,
                      errorHandler: errorHandler)
     }
-    public func listen(protocolFamily: SocketProtocolFamily, port: Int, backlog: Int = 8) throws {
+    public func listen(protocolFamily: ProtocolFamily, port: Int, backlog: Int = 8) throws {
         try impl.listen(protocolFamily: protocolFamily,
                         port: port, backlog: backlog)
     }
@@ -76,7 +76,7 @@ public class TCPSocket {
             state = .inited
         }
         
-        public var endPoint: SocketEndPoint? {
+        public var endPoint: EndPoint? {
             return queue.sync { _endPoint }
         }
         
@@ -91,7 +91,7 @@ public class TCPSocket {
             }
         }
         
-        public func connect(protocolFamily: SocketProtocolFamily,
+        public func connect(protocolFamily: ProtocolFamily,
                             hostname: String,
                             port: Int,
                             successHandler: @escaping () -> Void,
@@ -118,7 +118,7 @@ public class TCPSocket {
                 self.connectTask = task
                 state = .connecting
                 
-                func resolveHandler(endPoints: [SocketEndPoint]) {
+                func resolveHandler(endPoints: [EndPoint]) {
                     let task = task!
                     guard self.connectTask === task else { return }
                     
@@ -138,7 +138,7 @@ public class TCPSocket {
             }
         }
         
-        public func connect(endPoint: SocketEndPoint,
+        public func connect(endPoint: EndPoint,
                             successHandler: @escaping () -> Void,
                             errorHandler: @escaping (Error) -> Void)
         {
@@ -195,7 +195,7 @@ public class TCPSocket {
             }
         }
         
-        public func listen(protocolFamily: SocketProtocolFamily, port: Int, backlog: Int) throws {
+        public func listen(protocolFamily: ProtocolFamily, port: Int, backlog: Int) throws {
             func body() throws {
                 precondition(state == .inited)
                 precondition(self.socket == nil)
@@ -207,7 +207,7 @@ public class TCPSocket {
                     throw PosixError.init(errno: errno, message: "setSockOpt(SO_REUSEADDR)")
                 }
                 
-                let endPoint: SocketEndPoint
+                let endPoint: EndPoint
                 switch protocolFamily {
                 case .ipv6:
                     let sockAddr = sockaddr_in6.init(sin6_len: UInt8(MemoryLayout<sockaddr_in6>.size),
@@ -267,7 +267,7 @@ public class TCPSocket {
             }
         }
         
-        private func initSocket(protocolFamily: SocketProtocolFamily, type: Int32)
+        private func initSocket(protocolFamily: ProtocolFamily, type: Int32)
             throws -> RawDispatchSocket
         {
             let socket = try RawDispatchSocket.init(protocolFamily: protocolFamily,
@@ -278,7 +278,7 @@ public class TCPSocket {
         }
         
         private func initSocket(fd: Int32,
-                                protocolFamily: SocketProtocolFamily)
+                                protocolFamily: ProtocolFamily)
             throws -> RawDispatchSocket
         {
             let socket = try RawDispatchSocket.init(fd: fd,
@@ -317,7 +317,7 @@ public class TCPSocket {
             }
         }
 
-        private func _connect(endPoint: SocketEndPoint,
+        private func _connect(endPoint: EndPoint,
                               successHandler: @escaping () -> Void,
                               errorHandler: @escaping (Error) -> Void) throws {
             let socket = try initSocket(protocolFamily: endPoint.protocolFamily, type: SOCK_STREAM)
@@ -538,7 +538,7 @@ public class TCPSocket {
         
         private var state: State
         private var socket: RawDispatchSocket?
-        private var _endPoint: SocketEndPoint?
+        private var _endPoint: EndPoint?
         private var connectTask: ConnectTask?
         private var sendTask: SendTask?
         private var receiveTask: ReceiveTask?
@@ -555,7 +555,7 @@ public class TCPSocket {
     
     private class ConnectTask {
         public let nameResolveTask: NameResolveTask?
-        public let endPoint: SocketEndPoint?
+        public let endPoint: EndPoint?
         public let timer: DispatchSourceTimer?
         public let successHandler: () -> Void
         public let errorHandler: (Error) -> Void
@@ -571,7 +571,7 @@ public class TCPSocket {
             self.errorHandler = errorHandler
         }
         
-        public init(endPoint: SocketEndPoint,
+        public init(endPoint: EndPoint,
                     timer: DispatchSourceTimer,
                     successHandler: @escaping () -> Void,
                     errorHandler: @escaping (Error) -> Void)

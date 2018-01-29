@@ -1,11 +1,11 @@
 import Foundation
 
-public enum SocketEndPoint {
+public enum EndPoint {
     case ipv6(IPv6.EndPoint)
     case ipv4(IPv4.EndPoint)
 }
 
-extension SocketEndPoint {
+extension EndPoint {
     public var port: Int {
         get {
             switch self {
@@ -28,7 +28,7 @@ extension SocketEndPoint {
     }
 }
 
-extension SocketEndPoint : CustomStringConvertible {
+extension EndPoint : CustomStringConvertible {
     public var description: String {
         switch self {
         case .ipv6(let ep):
@@ -39,8 +39,8 @@ extension SocketEndPoint : CustomStringConvertible {
     }
 }
 
-extension SocketEndPoint {
-    public var protocolFamily: SocketProtocolFamily {
+extension EndPoint {
+    public var protocolFamily: ProtocolFamily {
         switch self {
         case .ipv6:
             return .ipv6
@@ -49,7 +49,7 @@ extension SocketEndPoint {
         }
     }
     
-    public init(protocolFamily: SocketProtocolFamily,
+    public init(protocolFamily: ProtocolFamily,
                 sockAddr: UnsafePointer<sockaddr>)
     {
         switch protocolFamily {

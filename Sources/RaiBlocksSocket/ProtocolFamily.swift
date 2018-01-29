@@ -1,11 +1,11 @@
 import Foundation
 
-public enum SocketProtocolFamily {
+public enum ProtocolFamily {
     case ipv6
     case ipv4
 }
 
-extension SocketProtocolFamily {
+extension ProtocolFamily {
     public var value: Int32 {
         switch self {
         case .ipv6:
