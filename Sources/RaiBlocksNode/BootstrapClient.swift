@@ -1,5 +1,6 @@
 import Foundation
 import RaiBlocksBasic
+import RaiBlocksSocket
 
 public class BootstrapClient {
     public init(callbackQueue: DispatchQueue) {

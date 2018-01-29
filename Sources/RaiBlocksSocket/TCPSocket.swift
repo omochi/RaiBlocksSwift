@@ -1,4 +1,6 @@
 import Foundation
+import RaiBlocksPosix
+import RaiBlocksRandom
 
 public class TCPSocket {
     public convenience init(callbackQueue: DispatchQueue) throws {
@@ -122,7 +124,7 @@ public class TCPSocket {
                     
                     do {
                         guard var endPoint = endPoints.getRandom() else {
-                            throw GenericError.init(message: "name resolve failed, no entry: hostname=\(hostname)")
+                            throw SocketError.init(message: "name resolve failed, no entry: hostname=\(hostname)")
                         }
                         endPoint.port = port
                         print("connect: \(endPoint)")
@@ -333,7 +335,7 @@ public class TCPSocket {
             let timer = DispatchSource.makeTimerSource(flags: [], queue: queue)
             timer.schedule(deadline: .now() + connectTimeoutInterval)
             timer.setEventHandler {
-                self.doError(error: GenericError.init(message: "connect(\(endPoint)) timeout"),
+                self.doError(error: SocketError.init(message: "connect(\(endPoint)) timeout"),
                              callbackHandler: errorHandler)
             }
             timer.resume()
@@ -447,7 +449,7 @@ public class TCPSocket {
                         throw PosixError.init(errno: errno, message: "read(\(chunk.count))")
                     } else if st == 0 {
                         if let size = task.size {
-                            throw GenericError.init(message: "receive(\(size)) failed: connection closed")
+                            throw SocketError.init(message: "receive(\(size)) failed: connection closed")
                         } else {
                             break
                         }

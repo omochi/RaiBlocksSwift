@@ -1,5 +1,5 @@
 import Foundation
-import RaiBlocksCRandom
+import RaiBlocksRandom
 
 public struct Work {
     public init(_ value: UInt64) {

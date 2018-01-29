@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import RaiBlocksRandom
 
 public class Environment {
     public init(dataDir: FilePath,

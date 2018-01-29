@@ -98,7 +98,7 @@ private func nameResolveSync(protocolFamily: SocketProtocolFamily,
     let st = getaddrinfo(hostname, nil, &hint, &firstAddrinfo)
     if st != 0 {
         let message = String.init(cString: gai_strerror(st))
-        throw GenericError.init(message: "getaddrinfo(\(hostname)): \(message)")
+        throw SocketError.init(message: "getaddrinfo(\(hostname)): \(message)")
     }
     
     var result: [SocketEndPoint] = []

@@ -1,4 +1,5 @@
 import Foundation
+import RaiBlocksPosix
 
 public class RawDispatchSocket {
     public init(fd: Int32,
