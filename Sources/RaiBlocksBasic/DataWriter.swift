@@ -60,7 +60,7 @@ public protocol DataWritable {
 }
 
 extension DataWritable {
-    public func asData() -> Data {
+    public func writeToData() -> Data {
         let writer = DataWriter()
         self.write(to: writer)
         return writer.data

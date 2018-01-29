@@ -21,18 +21,29 @@ extension Work : CustomStringConvertible {
     }
 }
 
-extension Work {
+extension Work : DataConvertible {
+    public init(data: Data) {
+        precondition(data.count == 8)
+        let value = data.withUnsafeBytes { (p: UnsafePointer<UInt64>) in
+            p.pointee
+        }
+        self.init(NSSwapBigLongLongToHost(value))
+    }
+
     public func asData() -> Data {
+        let value = NSSwapHostLongLongToBig(self.value)
         var data = Data.init(count: 8)
         data.withUnsafeMutableBytes { (p: UnsafeMutablePointer<UInt64>) in
-            p.pointee = self.value
+            p.pointee = value
         }
         return data
     }
-    
+}
+
+extension Work {
     public func score(for hash: Block.Hash) -> UInt64 {
         let blake = Blake2B.init(outputSize: 8)
-        blake.update(data: self.asData())
+        blake.update(data: Data(self.asData().reversed()))
         blake.update(data: hash.asData())
         let data = blake.finalize()
         return data.withUnsafeBytes { (p: UnsafePointer<UInt64>) in

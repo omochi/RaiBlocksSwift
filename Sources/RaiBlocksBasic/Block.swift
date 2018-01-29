@@ -1,7 +1,8 @@
 import Foundation
+import SQLite
 
 public enum Block {
-    public struct Hash : DataWritable, DataReadable {
+    public struct Hash : DataConvertible, DataWritable, DataReadable {
         public init(data: Data) {
             precondition(data.count == Hash.size)
             
@@ -30,11 +31,11 @@ public enum Block {
     
     public enum Kind : UInt8 {
         case invalid = 0
-        case notABlock
-        case send
-        case receive
-        case open
-        case change
+        case notABlock = 1
+        case send = 2
+        case receive = 3
+        case open = 4
+        case change = 5
     }
     
     public class Send : BlockProtocol {
@@ -72,6 +73,12 @@ public enum Block {
             blake.update(data: destination.asData())
             blake.update(data: balance.asData())
         }
+        
+        public func saveToDB(connection: SQLite.Connection) throws {
+
+        }
+        
+        public static let kind: Kind = .send
     }
     
     public class Receive : BlockProtocol {
@@ -104,6 +111,8 @@ public enum Block {
             blake.update(data: previous.asData())
             blake.update(data: source.asData())
         }
+        
+        public static let kind: Kind = .receive
     }
     
     public class Open : BlockProtocol {
@@ -141,6 +150,8 @@ public enum Block {
             blake.update(data: representative.asData())
             blake.update(data: account.asData())
         }
+        
+        public static let kind: Kind = .open
     }
     
     public class Change : BlockProtocol {
@@ -173,6 +184,13 @@ public enum Block {
             blake.update(data: previous.asData())
             blake.update(data: representative.asData())
         }
+        
+        public static let kind: Kind = .change
     }
+    
+    case send(Send)
+    case receive(Receive)
+    case open(Open)
+    case change(Change)
 }
 

@@ -1,5 +1,6 @@
 import Foundation
 import BigInt
+import SQLite
 
 extension Data {
     public func toHex() -> String {
@@ -46,3 +47,8 @@ extension Data {
     }
 }
 
+extension Data {
+    public func asSQLite() -> SQLite.Blob {
+        return SQLite.Blob(data: self)
+    }
+}

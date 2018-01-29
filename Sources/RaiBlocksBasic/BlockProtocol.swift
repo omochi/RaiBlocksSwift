@@ -5,6 +5,8 @@ public protocol BlockProtocol : CustomStringConvertible {
     var work: Work? { get set }
     
     func hash(blake: Blake2B)
+    
+    static var kind: Block.Kind { get }
 }
 
 extension BlockProtocol {

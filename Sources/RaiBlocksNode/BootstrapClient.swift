@@ -52,7 +52,7 @@ public class BootstrapClient {
             request.age = UInt32.max
             request.count = UInt32.max
             
-            let data = request.asData()
+            let data = request.writeToData()
             
             _socket!.send(data: data,
                           successHandler: {

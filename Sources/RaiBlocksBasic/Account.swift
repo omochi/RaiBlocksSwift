@@ -2,7 +2,7 @@ import Foundation
 import BigInt
 
 public class Account : CustomStringConvertible {
-    public struct Address : DataWritable, DataReadable {
+    public struct Address : DataConvertible, DataWritable, DataReadable {
         public init(data: Data) {
             precondition(data.count == Address.size, "data must be \(Address.size) bytes")
             
@@ -29,26 +29,28 @@ public class Account : CustomStringConvertible {
         private let _data: Data
     }
     
-    public init(address: Address) {
-        self._address = address
-        self._headBlock = nil
-    }
-
-    public var address: Address {
-        return _address
+    public init(address: Address,
+                headBlock: Block.Hash,
+                amount: Amount,
+                representativeBlock: Block.Hash,
+                blockCount: Int) {
+        self.address = address
+        self.headBlock = headBlock
+        self.amount = amount
+        self.representativeBlock = representativeBlock
+        self.blockCount = blockCount
     }
     
-    public var headBlock: Block.Hash? {
-        return _headBlock
-    }
+    public let address: Address
+    public var headBlock: Block.Hash
+    public var amount: Amount
+    public var representativeBlock: Block.Hash
+    public var blockCount: Int    
     
     public var description: String {
         let fields = [
             "address=\(address)",
-            "headBlock=\(headBlock?.description ?? "")"]
+            "headBlock=\(headBlock)"]
         return "Account(\(fields.joined(separator: ", "))"
     }
-    
-    private let _address: Address
-    private var _headBlock: Block.Hash?
 }

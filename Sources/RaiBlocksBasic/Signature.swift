@@ -1,6 +1,6 @@
 import Foundation
 
-public struct Signature {
+public struct Signature : DataConvertible {
     public init(data: Data) {
         precondition(data.count == Signature.size)
         

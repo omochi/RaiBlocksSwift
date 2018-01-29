@@ -1,4 +1,5 @@
 import Foundation
+import SQLite
 
 extension Block.Hash : CustomStringConvertible {
     public var description: String {

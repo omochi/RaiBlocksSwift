@@ -93,8 +93,8 @@ public enum Message {
         public func write(to writer: DataWriter) {
             writer.write(header)
             writer.write(start ?? .zero)
-            writer.write(NSSwapHostIntToLittle(age))
-            writer.write(NSSwapHostIntToLittle(count))
+            writer.write(NSSwapHostIntToBig(age))
+            writer.write(NSSwapHostIntToBig(count))
         }
     }
     

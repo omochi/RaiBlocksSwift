@@ -1,5 +1,6 @@
 import Foundation
 import BigInt
+import SQLite
 
 public struct Amount {
     public enum Unit {
@@ -91,7 +92,11 @@ public func *=(a: inout Amount, b: Amount.Unit) {
     a = a * b
 }
 
-extension Amount {
+extension Amount : DataConvertible {
+    public init(data: Data) {
+        self.init(data.asBigUInt())
+    }
+    
     public func asData() -> Data {
         return value.asData(size: 16)
     }
