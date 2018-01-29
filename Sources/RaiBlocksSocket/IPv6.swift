@@ -52,6 +52,26 @@ extension IPv6.Address {
         }
         self.init(addr: addr)
     }
+    
+    public var isMappedV4: Bool {
+        guard addr.__u6_addr.__u6_addr32.0 == 0 else {
+            return false
+        }
+        guard addr.__u6_addr.__u6_addr32.1 == 0 else {
+            return false
+        }
+        guard addr.__u6_addr.__u6_addr32.2 == NSSwapHostIntToBig(0x0000FFFF) else {
+            return false
+        }
+        return true
+    }
+    
+    public var mappedV4: IPv4.Address? {
+        guard isMappedV4 else {
+            return nil
+        }
+        return IPv4.Address(addr: in_addr.init(s_addr: addr.__u6_addr.__u6_addr32.3))
+    }
 }
 
 extension IPv6.Address : Equatable {}
@@ -79,5 +99,15 @@ extension IPv6.EndPoint {
                                  sin6_flowinfo: 0,
                                  sin6_addr: address.addr,
                                  sin6_scope_id: 0)
+    }
+    
+    public var isMappedV4: Bool {
+        return address.isMappedV4
+    }
+    
+    public var mappedV4: IPv4.EndPoint? {
+        return address.mappedV4.map {
+            IPv4.EndPoint(address: $0, port: port)
+        }
     }
 }

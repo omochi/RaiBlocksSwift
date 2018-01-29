@@ -1,11 +1,12 @@
 import Foundation
 import RaiBlocksBasic
+import RaiBlocksSocket
 
 public enum Message {
     public enum Kind : UInt8, DataWritable {
         case invalid = 0
         case notAKind
-        case keepAlive
+        case keepalive
         case publish
         case confirmReq
         case confirmAck
@@ -61,12 +62,12 @@ public enum Message {
         }
         
         public func write(to writer: DataWriter) {
-            writer.write(magicNumber)
+            writer.write(magicNumber, byteOrder: .big)
             writer.write(versionMax)
             writer.write(versionUsing)
             writer.write(versionMin)
             writer.write(kind)
-            writer.write(extensions)
+            writer.write(extensions, byteOrder: .big)
         }
         
         public static let ipv4OnlyBitIndex: Int = 1
@@ -75,6 +76,27 @@ public enum Message {
         }
         
         public static let blockKindMask: UInt16 = 0x0F00
+    }
+    
+    public struct Keepalive : DataWritable {
+        public var header: Header
+        public var endPoints: [EndPoint]
+        
+        public init(endPoints: [EndPoint]) {
+            self.header = .init(kind: .keepalive)
+            self.endPoints = endPoints
+        }
+        
+        public func write(to writer: DataWriter) {
+            writer.write(header)
+            let n = min(8, endPoints.count)
+            for i in 0..<n {
+                writer.write(endPoints[i].toV6())
+            }
+            for _ in n..<8 {
+                writer.write(IPv6.EndPoint())
+            }
+        }
     }
     
     public struct AccountRequest : DataWritable {
@@ -93,8 +115,8 @@ public enum Message {
         public func write(to writer: DataWriter) {
             writer.write(header)
             writer.write(start ?? .zero)
-            writer.write(NSSwapHostIntToBig(age))
-            writer.write(NSSwapHostIntToBig(count))
+            writer.write(age, byteOrder: .little)
+            writer.write(count, byteOrder: .little)
         }
     }
     

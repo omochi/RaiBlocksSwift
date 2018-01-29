@@ -27,11 +27,11 @@ extension Work : DataConvertible {
         let value = data.withUnsafeBytes { (p: UnsafePointer<UInt64>) in
             p.pointee
         }
-        self.init(NSSwapBigLongLongToHost(value))
+        self.init(value.convert(from: .big))
     }
 
     public func asData() -> Data {
-        let value = NSSwapHostLongLongToBig(self.value)
+        let value = self.value.convert(to: .big)
         var data = Data.init(count: 8)
         data.withUnsafeMutableBytes { (p: UnsafeMutablePointer<UInt64>) in
             p.pointee = value

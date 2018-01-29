@@ -24,24 +24,24 @@ public class DataWriter {
         }
     }
     
-    public func write(_ value: UInt16) {
-        var value = NSSwapHostShortToBig(value)
+    public func write(_ value: UInt16, byteOrder: ByteOrder) {
+        var value = value.convert(to: byteOrder)
         let size = 2
         UnsafeMutablePointer(&value).withMemoryRebound(to: UInt8.self, capacity: size) { p in
             write(p, size: size)
         }
     }
     
-    public func write(_ value: UInt32) {
-        var value = NSSwapHostIntToBig(value)
+    public func write(_ value: UInt32, byteOrder: ByteOrder) {
+        var value = value.convert(to: byteOrder)
         let size = 4
         UnsafeMutablePointer(&value).withMemoryRebound(to: UInt8.self, capacity: size) { p in
             write(p, size: size)
         }
     }
     
-    public func write(_ value: UInt64) {
-        var value = NSSwapHostLongLongToBig(value)
+    public func write(_ value: UInt64, byteOrder: ByteOrder) {
+        var value = value.convert(to: byteOrder)
         let size = 8
         UnsafeMutablePointer(&value).withMemoryRebound(to: UInt8.self, capacity: size) { p in
             write(p, size: size)

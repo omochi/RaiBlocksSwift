@@ -91,5 +91,14 @@ extension EndPoint {
             }
         }
     }
+    
+    public func toV6() -> IPv6.EndPoint {
+        switch self {
+        case .ipv6(let ep):
+            return ep
+        case .ipv4(let ep):
+            return ep.mapToV6()
+        }
+    }
 }
 

@@ -30,31 +30,31 @@ public class DataReader {
         return value
     }
     
-    public func read(_ type: UInt16.Type) throws -> UInt16 {
+    public func read(_ type: UInt16.Type, from byteOrder: ByteOrder) throws -> UInt16 {
         let size = 2
         var value = UInt16()
         try UnsafeMutablePointer(&value).withMemoryRebound(to: UInt8.self, capacity: size) { p in
             try read(p, size: size)
         }
-        return NSSwapBigShortToHost(value)
+        return value.convert(from: byteOrder)
     }
     
-    public func read(_ type: UInt32.Type) throws -> UInt32 {
+    public func read(_ type: UInt32.Type, from byteOrder: ByteOrder) throws -> UInt32 {
         let size = 4
         var value = UInt32()
         try UnsafeMutablePointer(&value).withMemoryRebound(to: UInt8.self, capacity: size) { p in
             try read(p, size: size)
         }
-        return NSSwapBigIntToHost(value)
+        return value.convert(from: byteOrder)
     }
     
-    public func read(_ type: UInt64.Type) throws -> UInt64 {
+    public func read(_ type: UInt64.Type, from byteOrder: ByteOrder) throws -> UInt64 {
         let size = 8
         var value = UInt64()
         try UnsafeMutablePointer(&value).withMemoryRebound(to: UInt8.self, capacity: size) { p in
             try read(p, size: size)
         }
-        return NSSwapBigLongLongToHost(value)
+        return value.convert(from: byteOrder)
     }
     
     public let data: Data
