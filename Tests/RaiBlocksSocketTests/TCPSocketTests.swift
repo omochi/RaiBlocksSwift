@@ -6,9 +6,9 @@
 //
 
 import XCTest
-import RaiBlocksBasic
+import RaiBlocksSocket
 
-class SocketTests: XCTestCase {
+class TCPSocketTests: XCTestCase {
     
     func testConnect1() throws {
         let exp = self.expectation(description: "")

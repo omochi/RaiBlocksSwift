@@ -39,6 +39,21 @@ extension EndPoint : CustomStringConvertible {
     }
 }
 
+extension EndPoint : Equatable {}
+
+public func ==(a: EndPoint, b: EndPoint) -> Bool {
+    switch (a, b) {
+    case (.ipv6(let epa), .ipv6(let epb)):
+        return epa == epb
+    case (.ipv4(let epa), .ipv4(let epb)):
+        return epa == epb
+    case (.ipv6, _):
+        return false
+    case (.ipv4, _):
+        return false
+    }
+}
+
 extension EndPoint {
     public var protocolFamily: ProtocolFamily {
         switch self {
@@ -46,6 +61,15 @@ extension EndPoint {
             return .ipv6
         case .ipv4:
             return .ipv4
+        }
+    }
+    
+    public init(protocolFamily: ProtocolFamily) {
+        switch protocolFamily {
+        case .ipv6:
+            self = .ipv6(.init())
+        case .ipv4:
+            self = .ipv4(.init())
         }
     }
     
@@ -78,18 +102,23 @@ extension EndPoint {
     }
     
     public mutating func withMutableSockAddrPointer<R>(_ f: (UnsafeMutablePointer<sockaddr>, Int) throws -> R) rethrows -> R {
+        let ret: R
         switch self {
         case .ipv6(let ep):
             var addr = ep.asSockAddr()
-            return try UnsafeMutablePointer(&addr).withMemoryRebound(to: sockaddr.self, capacity: 1) { p in
+            ret = try UnsafeMutablePointer(&addr).withMemoryRebound(to: sockaddr.self, capacity: 1) { p in
                 try f(p, MemoryLayout.size(ofValue: addr))
             }
+            self = .ipv6(.init(sockAddr: addr))
+            
         case .ipv4(let ep):
             var addr = ep.asSockAddr()
-            return try UnsafeMutablePointer(&addr).withMemoryRebound(to: sockaddr.self, capacity: 1) { p in
+            ret = try UnsafeMutablePointer(&addr).withMemoryRebound(to: sockaddr.self, capacity: 1) { p in
                 try f(p, MemoryLayout.size(ofValue: addr))
             }
+            self = .ipv4(.init(sockAddr: addr))
         }
+        return ret
     }
     
     public func toV6() -> IPv6.EndPoint {
@@ -98,6 +127,15 @@ extension EndPoint {
             return ep
         case .ipv4(let ep):
             return ep.mapToV6()
+        }
+    }
+    
+    public static func listening(protocolFamily: ProtocolFamily, port: Int) -> EndPoint {
+        switch protocolFamily {
+        case .ipv6:
+            return .ipv6(IPv6.EndPoint.listening(port: port))
+        case .ipv4:
+            return .ipv4(IPv4.EndPoint.listening(port: port))
         }
     }
 }

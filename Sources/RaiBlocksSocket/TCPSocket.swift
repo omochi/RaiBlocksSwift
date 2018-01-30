@@ -120,7 +120,6 @@ public class TCPSocket {
                 
                 func resolveHandler(endPoints: [EndPoint]) {
                     let task = task!
-                    guard self.connectTask === task else { return }
                     
                     do {
                         guard var endPoint = endPoints.getRandom() else {
@@ -200,42 +199,16 @@ public class TCPSocket {
                 precondition(state == .inited)
                 precondition(self.socket == nil)
                 
-                let socket = try initSocket(protocolFamily: protocolFamily, type: SOCK_STREAM)
-                
-                var st = socket.setSockOpt(level: SOL_SOCKET, name: SO_REUSEADDR, value: 1)
-                if st != 0 {
-                    throw PosixError.init(errno: errno, message: "setSockOpt(SO_REUSEADDR)")
+                let socket = try initSocket {
+                    try RawDispatchSocket(protocolFamily: protocolFamily,
+                                          type: SOCK_STREAM,
+                                          queue: queue)
                 }
                 
-                let endPoint: EndPoint
-                switch protocolFamily {
-                case .ipv6:
-                    let sockAddr = sockaddr_in6.init(sin6_len: UInt8(MemoryLayout<sockaddr_in6>.size),
-                                                     sin6_family: UInt8(AF_INET6),
-                                                     sin6_port: NSSwapHostShortToBig(UInt16(port)),
-                                                     sin6_flowinfo: 0,
-                                                     sin6_addr: in6addr_any,
-                                                     sin6_scope_id: 0)
-                    endPoint = .ipv6(IPv6.EndPoint(sockAddr: sockAddr))
-                case .ipv4:
-                    let sockAddr = sockaddr_in.init(sin_len: UInt8(MemoryLayout<sockaddr_in>.size),
-                                                    sin_family: UInt8(AF_INET),
-                                                    sin_port: NSSwapHostShortToBig(UInt16(port)),
-                                                    sin_addr: in_addr(s_addr: INADDR_ANY),
-                                                    sin_zero: (0, 0, 0, 0, 0, 0, 0, 0))
-                    endPoint = .ipv4(IPv4.EndPoint(sockAddr: sockAddr))
-                }
-                
-                st = socket.bind(endPoint: endPoint)
-                if st != 0 {
-                    throw PosixError.init(errno: errno, message: "bind(\(port))")
-                }
-                
-                st = socket.listen(backlog: backlog)
-                if st != 0 {
-                    throw PosixError.init(errno: errno, message: "listen(\(port))")
-                }
-                
+                try socket.setSockOpt(level: SOL_SOCKET, name: SO_REUSEADDR, value: 1)
+                let endPoint: EndPoint = .listening(protocolFamily: protocolFamily, port: port)
+                try socket.bind(endPoint: endPoint)
+                try socket.listen(backlog: backlog)
                 state = .listening
             }
             
@@ -267,31 +240,11 @@ public class TCPSocket {
             }
         }
         
-        private func initSocket(protocolFamily: ProtocolFamily, type: Int32)
-            throws -> RawDispatchSocket
-        {
-            let socket = try RawDispatchSocket.init(protocolFamily: protocolFamily,
-                                                    type: type,
-                                                    queue: queue)
-            self.initSocket(socket)
-            return socket
-        }
-        
-        private func initSocket(fd: Int32,
-                                protocolFamily: ProtocolFamily)
-            throws -> RawDispatchSocket
-        {
-            let socket = try RawDispatchSocket.init(fd: fd,
-                                                    protocolFamily: protocolFamily,
-                                                    queue: queue)
-            self.initSocket(socket)
-            return socket
-        }
-        
-        private func initSocket(_ socket: RawDispatchSocket) {
-            assert(state == .inited || state == .connecting)
-            assert(self.socket == nil)
+        private func initSocket(_ socketFactory: () throws -> RawDispatchSocket) rethrows -> RawDispatchSocket {
+            precondition(state == .inited || state == .connecting)
+            precondition(self.socket == nil)
             
+            let socket = try socketFactory()
             self.socket = socket
 
             socket.setReadHandler {
@@ -315,18 +268,25 @@ public class TCPSocket {
                     return
                 }
             }
+            
+            return socket
         }
 
         private func _connect(endPoint: EndPoint,
                               successHandler: @escaping () -> Void,
                               errorHandler: @escaping (Error) -> Void) throws {
-            let socket = try initSocket(protocolFamily: endPoint.protocolFamily, type: SOCK_STREAM)
+            let socket = try initSocket {
+                try RawDispatchSocket(protocolFamily: endPoint.protocolFamily,
+                                      type: SOCK_STREAM,
+                                      queue: queue)
+            }
             assert(socket.writeSuspended)
             
-            let st = socket.connect(endPoint: endPoint)
-            if st != 0 {
-                if errno != EINPROGRESS {
-                    throw PosixError.init(errno: errno, message: "connect(\(endPoint))")
+            do {
+                try socket.connect(endPoint: endPoint)
+            } catch let e as PosixError {
+                if e.errno != EINPROGRESS {
+                    throw e
                 }
             }
             
@@ -384,18 +344,19 @@ public class TCPSocket {
             func body() throws {
                 let socket = self.socket!
                 
-                let st = task.data.withUnsafeBytes { p in
-                    socket.send(data: p + task.sentSize, size: task.data.count - task.sentSize)
-                }
-                if st == -1 {
-                    if errno == EAGAIN {
+                let sentSize: Int
+                do {
+                    let offset = task.sentSize
+                    let chunk = task.data.subdata(in: offset..<task.data.count - offset)
+                    sentSize = try socket.send(data: chunk)
+                } catch let e as PosixError {
+                    if e.errno == EAGAIN {
                         return
                     }
-                    
-                    throw PosixError.init(errno: errno, message: "send()")
+                    throw e
                 }
                 
-                task.sentSize += st
+                task.sentSize += sentSize
                 if task.sentSize < task.data.count {
                     return
                 }
@@ -412,7 +373,6 @@ public class TCPSocket {
             } catch let error {
                 doError(error: error, callbackHandler: task.errorHandler)
             }
-            
         }
         
         private func doReceive() {
@@ -422,39 +382,39 @@ public class TCPSocket {
                 let socket = self.socket!
                 
                 while true {
-                    var chunk: Data
+                    let chunkSize: Int
                     
                     if let size = task.size {
                         let rem = size - task.data.count
                         if rem == 0 {
                             break
                         }
-                        chunk = Data.init(count: rem)
+                        chunkSize = rem
                     } else {
-                        chunk = Data.init(count: 1024)
+                        chunkSize = 1024
                     }
                     
-                    let st = chunk.withUnsafeMutableBytes { p in
-                        socket.recv(data: p, size: chunk.count)
-                    }
-                    if st == -1 {
-                        if errno == EAGAIN {
-                            if task.size == nil {
-                                break
-                            } else {
+                    let chunk: Data
+                    do {
+                        chunk = try socket.recv(size: chunkSize)
+                    } catch let e as PosixError {
+                        if e.errno == EAGAIN {
+                            if let _ = task.size {
                                 return
+                            } else {
+                                break
                             }
                         }
-                        
-                        throw PosixError.init(errno: errno, message: "read(\(chunk.count))")
-                    } else if st == 0 {
+                        throw e
+                    }
+                    
+                    if chunk.count == 0 {
                         if let size = task.size {
-                            throw SocketError.init(message: "receive(\(size)) failed: connection closed")
+                            throw SocketError.init(message: "receive(\(task.data.count)/\(size)) failed: connection closed")
                         } else {
                             break
                         }
                     }
-                    chunk.count = st
                     task.data.append(chunk)
                 }
                 
@@ -477,18 +437,19 @@ public class TCPSocket {
             
             func body() throws {
                 let socket = self.socket!
-              
-                let (st, endPoint) = socket.accept()
-                if st == -1 {
-                    if errno == EWOULDBLOCK {
+                
+                let (rawSocket, endPoint): (RawDispatchSocket, EndPoint)
+                do {
+                    (rawSocket, endPoint) = try socket.accept(queue: self.queue)
+                } catch let e as PosixError {
+                    if e.errno == EWOULDBLOCK {
                         return
                     }
-                    
-                    throw PosixError.init(errno: errno, message: "accept()")
+                    throw e
                 }
-                
+
                 let newSocketImpl = try Impl.init(callbackQueue: callbackQueue)
-                let _ = try newSocketImpl.initSocket(fd: st, protocolFamily: socket.protocolFamily)
+                let _ = newSocketImpl.initSocket { rawSocket }
                 newSocketImpl._endPoint = endPoint
                 newSocketImpl.state = .connected
                 let newSocket = TCPSocket.init(impl: newSocketImpl)
@@ -590,10 +551,10 @@ public class TCPSocket {
     }
     
     private class SendTask {
-        public var data: Data
+        public let data: Data
         public var sentSize: Int
-        public var successHandler: () -> Void
-        public var errorHandler: (Error) -> Void
+        public let successHandler: () -> Void
+        public let errorHandler: (Error) -> Void
         
         public init(data: Data,
                     successHandler: @escaping () -> Void,
@@ -609,8 +570,8 @@ public class TCPSocket {
     private class ReceiveTask {
         public var data: Data
         public var size: Int?
-        public var successHandler: (Data) -> Void
-        public var errorHandler: (Error) -> Void
+        public let successHandler: (Data) -> Void
+        public let errorHandler: (Error) -> Void
         
         public init(size: Int?,
                     successHandler: @escaping (Data) -> Void,
@@ -624,8 +585,8 @@ public class TCPSocket {
     }
     
     private class AcceptTask {
-        public var successHandler: (TCPSocket) -> Void
-        public var errorHandler: (Error) -> Void
+        public let successHandler: (TCPSocket) -> Void
+        public let errorHandler: (Error) -> Void
         
         public init(successHandler: @escaping (TCPSocket) -> Void,
                     errorHandler: @escaping (Error) -> Void)
@@ -640,5 +601,4 @@ public class TCPSocket {
     }
     
     private let impl: Impl
-    
 }

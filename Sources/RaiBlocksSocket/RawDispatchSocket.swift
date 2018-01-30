@@ -54,36 +54,77 @@ public class RawDispatchSocket {
         }
     }
     
-    public func setSockOpt(level: Int32, name: Int32, value: CInt) -> Int32 {
-        var value = value
-        return Darwin.setsockopt(fd, level, name, UnsafeMutablePointer<CInt>(&value), UInt32(MemoryLayout<CInt>.size))
+    public func getSockName() throws -> EndPoint {
+        var endPoint = EndPoint.init(protocolFamily: protocolFamily)
+        try endPoint.withMutableSockAddrPointer { (addr, size) in
+            var tempSize = UInt32(size)
+            let st = Darwin.getsockname(fd, addr, &tempSize)
+            if st == -1 {
+                throw PosixError(errno: errno, message: "getsockname(\(fd))")
+            }
+            precondition(tempSize == size)
+        }
+        return endPoint
     }
     
-    public func connect(endPoint: EndPoint) -> Int32 {
-        return endPoint.withSockAddrPointer { (p, size) in
+    public func setSockOpt(level: Int32, name: Int32, value: CInt) throws {
+        var value = value
+        let st = Darwin.setsockopt(fd, level, name,
+                                   UnsafeMutablePointer<CInt>(&value),
+                                   UInt32(MemoryLayout<CInt>.size))
+        if st == -1 {
+            throw PosixError(errno: errno, message: "setsockopt(\(fd), \(level), \(name), \(value))")
+        }
+    }
+    
+    public func connect(endPoint: EndPoint) throws {
+        let st = endPoint.withSockAddrPointer { (p, size) in
             Darwin.connect(fd, p, UInt32(size))
+        }
+        if st == -1 {
+            throw PosixError(errno: errno, message: "connect(\(fd), \(endPoint))")
         }
     }
      
-    public func send(data: UnsafeRawPointer, size: Int) -> Int {
-        return Darwin.send(fd, data, size, 0)
+    public func send(data: Data) throws -> Int {
+        let st = data.withUnsafeBytes {
+            Darwin.send(fd, $0, data.count, 0)
+        }
+        if st == -1 {
+            throw PosixError(errno: errno, message: "send(\(fd), \(data.count))")
+        }
+        return st
+    }
+
+    public func recv(size: Int) throws -> Data {
+        var chunk = Data.init(count: size)
+        let st = chunk.withUnsafeMutableBytes {
+            Darwin.recv(fd, $0, size, 0)
+        }
+        if st == -1 {
+            throw PosixError(errno: errno, message: "recv(\(fd), \(size))")
+        }
+        chunk.count = st
+        return chunk
     }
     
-    public func recv(data: UnsafeMutableRawPointer, size: Int) -> Int {
-        return Darwin.recv(fd, data, size, 0)
-    }
-    
-    public func bind(endPoint: EndPoint) -> Int32 {
-        return endPoint.withSockAddrPointer { (p, size) in
+    public func bind(endPoint: EndPoint) throws {
+        let st = endPoint.withSockAddrPointer { (p, size) in
             Darwin.bind(fd, p, UInt32(size))
+        }
+        if st == -1 {
+            throw PosixError(errno: errno, message: "bind(\(fd), \(endPoint))")
         }
     }
 
-    public func listen(backlog: Int) -> Int32 {
-        return Darwin.listen(fd, Int32(backlog))
+    public func listen(backlog: Int) throws {
+        let st = Darwin.listen(fd, Int32(backlog))
+        if st == -1 {
+            throw PosixError(errno: errno, message: "listen(\(fd), \(backlog))")
+        }
     }
     
-    public func accept() -> (Int32, EndPoint) {
+    public func accept(queue: DispatchQueue) throws -> (RawDispatchSocket, EndPoint) {
         var endPoint: EndPoint
         switch protocolFamily {
         case .ipv6:
@@ -95,7 +136,40 @@ public class RawDispatchSocket {
             var size = UInt32(size)
             return Darwin.accept(fd, p, &size)
         }
-        return (st, endPoint)
+        if st == -1 {
+            throw PosixError(errno: errno, message: "accept(\(fd))")
+        }
+        return (try RawDispatchSocket(fd: st, protocolFamily: protocolFamily, queue: queue), endPoint)
+    }
+    
+    public func sendTo(data: Data, endPoint: EndPoint) throws -> Int {
+        let st = data.withUnsafeBytes { (p: UnsafePointer<UInt8>) in
+            endPoint.withSockAddrPointer { (addr, size) in
+                Darwin.sendto(fd, p, data.count, 0, addr, UInt32(size))
+            }
+        }
+        if st == -1 {
+            throw PosixError(errno: errno, message: "sendto(\(fd), \(data.count), 0, \(endPoint))")
+        }
+        return st
+    }
+    
+    public func recvFrom(size: Int) throws -> (Data, EndPoint) {
+        var chunk = Data.init(count: size)
+        var endPoint = EndPoint.init(protocolFamily: protocolFamily)
+        let st: Int = chunk.withUnsafeMutableBytes { (p: UnsafeMutablePointer<UInt8>) in
+            endPoint.withMutableSockAddrPointer { (addr, addrSize) -> Int in
+                var tempAddrSize: UInt32 = UInt32(addrSize)
+                let st = Darwin.recvfrom(fd, p, size, 0, addr, &tempAddrSize)
+                precondition(tempAddrSize == UInt32(addrSize))
+                return st
+            }
+        }
+        if st == -1 {
+            throw PosixError(errno: errno, message: "recvfrom(\(fd), \(size))")
+        }
+        chunk.count = st
+        return (chunk, endPoint)
     }
     
     public func resumeRead() {

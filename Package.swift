@@ -11,7 +11,7 @@ let package = Package(
         ],
     dependencies: [
         .package(url: "https://github.com/attaswift/BigInt.git", from: "3.0.2"),
-        .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.11.4")
+        .package(url: "https://github.com/omochi/SQLite.swift.git", from: "0.11.4")
         ],
     targets: [
         .target(name: "RaiBlocksCRandom", dependencies: []),
@@ -25,6 +25,7 @@ let package = Package(
         .target(name: "RaiBlocksBasic",
                 dependencies: ["RaiBlocksCRandom", "RaiBlocksSocket", "BLAKE2", "ED25519Donna", "BigInt", "SQLite"]),
         .target(name: "RaiBlocksNode", dependencies: ["RaiBlocksBasic"]),
+        .testTarget(name: "RaiBlocksSocketTests", dependencies: ["RaiBlocksSocket"]),
         .testTarget(name: "RaiBlocksBasicTests", dependencies: ["RaiBlocksBasic"]),
         .testTarget(name: "RaiBlocksNodeTests", dependencies: ["RaiBlocksNode"])
         ]

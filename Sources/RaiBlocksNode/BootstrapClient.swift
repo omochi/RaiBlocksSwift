@@ -136,7 +136,6 @@ public class BootstrapClient {
         }
     }
     
-    
     private let queue: DispatchQueue
     private let callbackQueue: DispatchQueue
     private var _terminated: Bool

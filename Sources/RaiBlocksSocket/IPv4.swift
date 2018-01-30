@@ -58,6 +58,10 @@ extension IPv4.Address {
         addr.__u6_addr.__u6_addr32 = (0, 0, NSSwapHostIntToBig(0x0000FFFF), self.addr.s_addr)
         return IPv6.Address(addr: addr)
     }
+    
+    public static var any: IPv4.Address {
+        return IPv4.Address(addr: .init(s_addr: INADDR_ANY))
+    }
 }
 
 extension IPv4.Address : Equatable {}
@@ -70,6 +74,12 @@ extension IPv4.EndPoint : CustomStringConvertible {
     public var description: String {
         return "\(address):\(port)"
     }
+}
+
+extension IPv4.EndPoint : Equatable {}
+
+public func ==(a: IPv4.EndPoint, b: IPv4.EndPoint) -> Bool {
+    return a.address == b.address && a.port == b.port
 }
 
 extension IPv4.EndPoint {
@@ -88,5 +98,9 @@ extension IPv4.EndPoint {
     
     public func mapToV6() -> IPv6.EndPoint {
         return IPv6.EndPoint(address: address.mapToV6(), port: port)
+    }
+    
+    public static func listening(port: Int) -> IPv4.EndPoint {
+        return IPv4.EndPoint(address: .any, port: port)
     }
 }
