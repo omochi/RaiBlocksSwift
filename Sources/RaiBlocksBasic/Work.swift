@@ -23,7 +23,23 @@ extension Work : CustomStringConvertible {
     }
 }
 
+extension Work : DataConvertible {
+    public func asData() -> Data {
+        var data = Data.init(count: 8)
+        data.withUnsafeMutableBytes { (p: UnsafeMutablePointer<UInt64>) in
+            p.pointee = value.convert(to: .little)
+        }
+        return data
+    }
+}
+
 extension Work : DataWritable {
+    public func write(to writer: DataWriter) {
+        writer.write(asData())
+    }
+}
+
+extension Work : DataReadable {
     public init(data: Data) {
         precondition(data.count == 8)
         let value = data.withUnsafeBytes { (p: UnsafePointer<UInt64>) in
@@ -32,9 +48,16 @@ extension Work : DataWritable {
         self.init(value.convert(from: .little))
     }
     
-    public func write(to writer: DataWriter) {
-        writer.write(self.value, byteOrder: .little)
+    public init(from reader: DataReader) throws {
+        let value = try reader.read(UInt64.self, from: .little)
+        self.init(value)
     }
+}
+
+extension Work : Equatable {}
+
+public func ==(a: Work, b: Work) -> Bool {
+    return a.value == b.value
 }
 
 extension Work {

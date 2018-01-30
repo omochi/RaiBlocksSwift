@@ -3,8 +3,10 @@ import RaiBlocksBasic
 import RaiBlocksSocket
 
 public class BootstrapClient {
-    public init(callbackQueue: DispatchQueue) {
+    public init(messageWriter: MessageWriter,
+                callbackQueue: DispatchQueue) {
         queue = DispatchQueue.init(label: "BootstrapClient.queue")
+        self.messageWriter = messageWriter
         self.callbackQueue = callbackQueue
         _terminated = false
     }
@@ -49,13 +51,11 @@ public class BootstrapClient {
                                errorHandler: @escaping (Error) -> Void) {
         weak var wself = self
         queue.sync {
-            var request = Message.AccountRequest.init()
+            var request = Message.AccountRequest()
             request.age = UInt32.max
             request.count = UInt32.max
             
-            let data = request.asData()
-            
-            _socket!.send(data: data,
+            _socket!.send(data: messageWriter.write(message: request),
                           successHandler: {
                             wself?.receiveAccount(entryHandler: entryHandler,
                                                   errorHandler: errorHandler)
@@ -84,7 +84,7 @@ public class BootstrapClient {
         _socket!.receive(size: 32 * 2,
                          successHandler: { data in
                             do {
-                                let entry = try Message.AccountResponseEntry.init(from: data)
+                                let entry = try Message.AccountResponseEntry(from: DataReader(data: data))
                                 
                                 wself?.postCallback { `self` in
                                     return {
@@ -137,6 +137,7 @@ public class BootstrapClient {
     }
     
     private let queue: DispatchQueue
+    private let messageWriter: MessageWriter
     private let callbackQueue: DispatchQueue
     private var _terminated: Bool
     private var _errorHandler: ((Error) -> Void)?

@@ -1,0 +1,8 @@
+import Foundation
+import RaiBlocksBasic
+
+public protocol MessageProtocol : DataWritable {
+    var blockKind: Block.Kind? { get }
+    
+    static var kind: Message.Kind { get }
+}

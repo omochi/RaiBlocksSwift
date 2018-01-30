@@ -2,7 +2,7 @@ import Foundation
 import SQLite
 
 public enum Block {
-    public struct Hash : DataWritable, DataReadable {
+    public struct Hash : DataConvertible, DataWritable, DataReadable {
         public init(data: Data) {
             precondition(data.count == Hash.size)
             
@@ -15,7 +15,7 @@ public enum Block {
         }
         
         public func write(to writer: DataWriter) {
-            writer.write(data: _data)
+            writer.write(_data)
         }
         
         public func asData() -> Data {
@@ -58,6 +58,13 @@ public enum Block {
             self.work = work
         }
         
+        public required init(from reader: DataReader) throws {
+            previous = try reader.read(Block.Hash.self)
+            destination = try reader.read(Account.Address.self)
+            balance = try reader.read(Amount.self)
+            try self.readSuffix(from: reader)
+        }
+        
         public var description: String {
             let fields = [
                 "previous=\(previous)",
@@ -74,8 +81,11 @@ public enum Block {
             blake.update(data: balance.asData())
         }
         
-        public func saveToDB(connection: SQLite.Connection) throws {
-
+        public func write(to writer: DataWriter) {
+            writer.write(previous)
+            writer.write(destination)
+            writer.write(balance)
+            writeSuffix(to: writer)
         }
         
         public static let kind: Kind = .send
@@ -98,6 +108,12 @@ public enum Block {
             self.work = work
         }
         
+        public required init(from reader: DataReader) throws {
+            previous = try reader.read(Block.Hash.self)
+            source = try reader.read(Block.Hash.self)
+            try self.readSuffix(from: reader)
+        }
+        
         public var description: String {
             let fields = [
                 "previous=\(previous)",
@@ -110,6 +126,12 @@ public enum Block {
         public func hash(blake: Blake2B) {
             blake.update(data: previous.asData())
             blake.update(data: source.asData())
+        }
+        
+        public func write(to writer: DataWriter) {
+            writer.write(previous)
+            writer.write(source)
+            writeSuffix(to: writer)
         }
         
         public static let kind: Kind = .receive
@@ -135,6 +157,13 @@ public enum Block {
             self.work = work
         }
         
+        public required init(from reader: DataReader) throws {
+            source = try reader.read(Block.Hash.self)
+            representative = try reader.read(Account.Address.self)
+            account = try reader.read(Account.Address.self)
+            try self.readSuffix(from: reader)
+        }
+        
         public var description: String {
             let fields = [
                 "source=\(source)",
@@ -149,6 +178,13 @@ public enum Block {
             blake.update(data: source.asData())
             blake.update(data: representative.asData())
             blake.update(data: account.asData())
+        }
+        
+        public func write(to writer: DataWriter) {
+            writer.write(source)
+            writer.write(representative)
+            writer.write(account)
+            writeSuffix(to: writer)
         }
         
         public static let kind: Kind = .open
@@ -171,6 +207,12 @@ public enum Block {
             self.work = work
         }
         
+        public required init(from reader: DataReader) throws {
+            previous = try reader.read(Block.Hash.self)
+            representative = try reader.read(Account.Address.self)
+            try self.readSuffix(from: reader)
+        }
+        
         public var description: String {
             let fields = [
                 "previous=\(previous)",
@@ -185,6 +227,12 @@ public enum Block {
             blake.update(data: representative.asData())
         }
         
+        public func write(to writer: DataWriter) {
+            writer.write(previous)
+            writer.write(representative)
+            writeSuffix(to: writer)
+        }
+        
         public static let kind: Kind = .change
     }
     
@@ -192,6 +240,7 @@ public enum Block {
     case receive(Receive)
     case open(Open)
     case change(Change)
+
 }
 
 extension Block {
@@ -205,44 +254,6 @@ extension Block {
     }
 }
 
-extension Block.Send : DataWritable {
-    public func write(to writer: DataWriter) {
-        writer.write(previous)
-        writer.write(destination)
-        writer.write(balance)
-        writer.write(signature ?? .zero)
-        writer.write(work ?? .zero)
-    }
-}
-
-extension Block.Receive : DataWritable {
-    public func write(to writer: DataWriter) {
-        writer.write(previous)
-        writer.write(source)
-        writer.write(signature ?? .zero)
-        writer.write(work ?? .zero)
-    }
-}
-
-extension Block.Open : DataWritable {
-    public func write(to writer: DataWriter) {
-        writer.write(source)
-        writer.write(representative)
-        writer.write(account)
-        writer.write(signature ?? .zero)
-        writer.write(work ?? .zero)
-    }
-}
-
-extension Block.Change : DataWritable {
-    public func write(to writer: DataWriter) {
-        writer.write(previous)
-        writer.write(representative)
-        writer.write(signature ?? .zero)
-        writer.write(work ?? .zero)
-    }
-}
-
 extension Block : DataWritable {
     public func write(to writer: DataWriter) {
         switch self {
@@ -253,3 +264,17 @@ extension Block : DataWritable {
         }
     }
 }
+
+extension Block {
+    public init(from reader: DataReader, kind: Block.Kind) throws {
+        switch kind {
+        case .invalid, .notABlock:
+            throw GenericError(message: "invalid block kind: \(kind)")
+        case .send: self = .send(try .init(from: reader))
+        case .receive: self = .receive(try .init(from: reader))
+        case .open: self = .open(try .init(from: reader))
+        case .change: self = .change(try .init(from: reader))
+        }
+    }
+}
+

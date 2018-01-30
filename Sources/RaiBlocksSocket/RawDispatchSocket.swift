@@ -55,14 +55,14 @@ public class RawDispatchSocket {
     }
     
     public func getSockName() throws -> EndPoint {
-        var endPoint = EndPoint.init(protocolFamily: protocolFamily)
+        var endPoint = EndPoint.zero(protocolFamily: protocolFamily)
         try endPoint.withMutableSockAddrPointer { (addr, size) in
             var tempSize = UInt32(size)
             let st = Darwin.getsockname(fd, addr, &tempSize)
             if st == -1 {
                 throw PosixError(errno: errno, message: "getsockname(\(fd))")
             }
-            precondition(tempSize == size)
+            assert(tempSize == UInt32(size))
         }
         return endPoint
     }
@@ -125,21 +125,20 @@ public class RawDispatchSocket {
     }
     
     public func accept(queue: DispatchQueue) throws -> (RawDispatchSocket, EndPoint) {
-        var endPoint: EndPoint
-        switch protocolFamily {
-        case .ipv6:
-            endPoint = .ipv6(.init())
-        case .ipv4:
-            endPoint = .ipv4(.init())
+        var endPoint = EndPoint.zero(protocolFamily: protocolFamily)
+        let st: Int32 = try endPoint.withMutableSockAddrPointer { (addr, size) in
+            var tempSize = UInt32(size)
+            let st = Darwin.accept(fd, addr, &tempSize)
+            if st == -1 {
+                throw PosixError(errno: errno, message: "accept(\(fd))")
+            }
+            assert(tempSize == UInt32(size))
+            return st
         }
-        let st: Int32 = endPoint.withMutableSockAddrPointer { (p, size) in
-            var size = UInt32(size)
-            return Darwin.accept(fd, p, &size)
-        }
-        if st == -1 {
-            throw PosixError(errno: errno, message: "accept(\(fd))")
-        }
-        return (try RawDispatchSocket(fd: st, protocolFamily: protocolFamily, queue: queue), endPoint)
+        let socket = try RawDispatchSocket(fd: st,
+                                           protocolFamily: protocolFamily,
+                                           queue: queue)
+        return (socket, endPoint)
     }
     
     public func sendTo(data: Data, endPoint: EndPoint) throws -> Int {
@@ -156,17 +155,17 @@ public class RawDispatchSocket {
     
     public func recvFrom(size: Int) throws -> (Data, EndPoint) {
         var chunk = Data.init(count: size)
-        var endPoint = EndPoint.init(protocolFamily: protocolFamily)
-        let st: Int = chunk.withUnsafeMutableBytes { (p: UnsafeMutablePointer<UInt8>) in
-            endPoint.withMutableSockAddrPointer { (addr, addrSize) -> Int in
-                var tempAddrSize: UInt32 = UInt32(addrSize)
+        var endPoint = EndPoint.zero(protocolFamily: protocolFamily)
+        let st: Int = try endPoint.withMutableSockAddrPointer { (addr, addrSize) in
+            try chunk.withUnsafeMutableBytes { (p: UnsafeMutablePointer<UInt8>) in
+                var tempAddrSize = UInt32(addrSize)
                 let st = Darwin.recvfrom(fd, p, size, 0, addr, &tempAddrSize)
-                precondition(tempAddrSize == UInt32(addrSize))
+                if st == -1 {
+                    throw PosixError(errno: errno, message: "recvfrom(\(fd), \(size))")
+                }
+                assert(tempAddrSize == UInt32(addrSize))
                 return st
             }
-        }
-        if st == -1 {
-            throw PosixError(errno: errno, message: "recvfrom(\(fd), \(size))")
         }
         chunk.count = st
         return (chunk, endPoint)

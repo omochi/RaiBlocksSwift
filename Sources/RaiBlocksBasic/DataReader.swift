@@ -57,6 +57,10 @@ public class DataReader {
         return value.convert(from: byteOrder)
     }
     
+    public func read<X: DataReadable>(_ type: X.Type) throws -> X {
+        return try X.init(from: self)
+    }
+    
     public let data: Data
     public var position: Int
 }
@@ -65,9 +69,3 @@ public protocol DataReadable {
     init(from reader: DataReader) throws
 }
 
-extension DataReadable {
-    public init(from data: Data) throws {
-        let reader = DataReader.init(data: data)
-        try self.init(from: reader)
-    }
-}

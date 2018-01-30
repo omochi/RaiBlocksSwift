@@ -6,11 +6,9 @@ public enum IPv6 {
             self.addr = addr
         }
         
-        public init() {
-            self.init(addr: in6_addr.init())
-        }
-
         public let addr: in6_addr
+        
+        public static let zero: Address = .init(addr: in6_addr())
     }
     
     public struct EndPoint {
@@ -21,13 +19,10 @@ public enum IPv6 {
             self.port = port
         }
         
-        public init() {
-            self.init(address: .init(),
-                      port: .init())
-        }
-        
         public var address: Address
         public var port: Int
+        
+        public static let zero: EndPoint = .init(address: .zero, port: 0)
     }
 }
 

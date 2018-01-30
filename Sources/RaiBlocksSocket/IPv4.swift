@@ -5,12 +5,10 @@ public enum IPv4 {
         public init(addr: in_addr) {
             self.addr = addr
         }
-        
-        public init() {
-            self.init(addr: in_addr.init())
-        }
-        
+
         public let addr: in_addr
+        
+        public static let zero: Address = .init(addr: in_addr())
     }
     
     public struct EndPoint {
@@ -21,13 +19,10 @@ public enum IPv4 {
             self.port = port
         }
         
-        public init() {
-            self.init(address: .init(),
-                      port: .init())
-        }
-        
         public var address: Address
         public var port: Int
+        
+        public static let zero: EndPoint = .init(address: .zero, port: 0)
     }
 }
 

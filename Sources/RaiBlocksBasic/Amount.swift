@@ -92,13 +92,18 @@ public func *=(a: inout Amount, b: Amount.Unit) {
     a = a * b
 }
 
-extension Amount : DataWritable {
+extension Amount : DataConvertible, DataWritable, DataReadable {
     public init(data: Data) {
         self.init(data.asBigUInt())
     }
     
+    public init(from reader: DataReader) throws {
+        let data = try reader.read(Data.self, size: 16)
+        self.init(data: data)
+    }
+    
     public func write(to writer: DataWriter) {
-        writer.write(data: value.asData(size: 16))
+        writer.write(asData())
     }
     
     public func asData() -> Data {

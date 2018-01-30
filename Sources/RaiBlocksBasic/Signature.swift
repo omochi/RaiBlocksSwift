@@ -1,14 +1,19 @@
 import Foundation
 
-public struct Signature : DataWritable {
+public struct Signature : DataConvertible, DataWritable, DataReadable {
     public init(data: Data) {
         precondition(data.count == Signature.size)
         
         self._data = data
     }
     
+    public init(from reader: DataReader) throws {
+        let data = try reader.read(Data.self, size: Signature.size)
+        self.init(data: data)
+    }
+    
     public func write(to writer: DataWriter) {
-        writer.write(data: _data)
+        writer.write(_data)
     }
 
     public func asData() -> Data {
@@ -32,4 +37,10 @@ extension Signature {
     public init(hexString: String) {
         self.init(data: Data.init(hexString: hexString))
     }
+}
+
+extension Signature : Equatable {}
+
+public func ==(a: Signature, b: Signature) -> Bool {
+    return a.asData() == b.asData()
 }

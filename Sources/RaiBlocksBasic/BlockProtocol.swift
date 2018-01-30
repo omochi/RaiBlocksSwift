@@ -1,6 +1,8 @@
 import Foundation
 
-public protocol BlockProtocol : CustomStringConvertible {
+public protocol BlockProtocol : class,
+    CustomStringConvertible, DataWritable, DataReadable
+{
     var signature: Signature? { get set }
     var work: Work? { get set }
     
@@ -16,8 +18,8 @@ extension BlockProtocol {
         return Block.Hash.init(data: blake.finalize())
     }
     
-    public mutating func sign(secretKey: SecretKey,
-                              address: Account.Address)
+    public func sign(secretKey: SecretKey,
+                     address: Account.Address)
     {
         let message = hash.asData()
         self.signature = secretKey.sign(message: message, address: address)
@@ -37,5 +39,17 @@ extension BlockProtocol {
             return nil
         }
         return work.score(for: hash)
+    }
+    
+    public func writeSuffix(to writer: DataWriter) {
+        writer.write(signature ?? .zero)
+        writer.write(work ?? .zero)
+    }
+    
+    public func readSuffix(from reader: DataReader) throws {
+        let signature = try reader.read(Signature.self)
+        self.signature = signature != .zero ? signature : nil
+        let work = try reader.read(Work.self)
+        self.work = work != .zero ? work : nil
     }
 }

@@ -1,6 +1,4 @@
 import Foundation
-import BigInt
-import SQLite
 
 public class DataWriter {
     public init() {
@@ -11,7 +9,7 @@ public class DataWriter {
         data.append(pointer, count: size)
     }
     
-    public func write(data: Data) {
+    public func write(_ data: Data) {
         data.withUnsafeBytes { (p: UnsafePointer<UInt8>) in
             write(p, size: data.count)
         }
@@ -58,19 +56,7 @@ public class DataWriter {
 
 public protocol DataWritable {
     func write(to writer: DataWriter)    
-    func asData() -> Data
 }
 
-extension DataWritable {
-    public func asData() -> Data {
-        let writer = DataWriter()
-        self.write(to: writer)
-        return writer.data
-    }
-    
-    public func asSQLite() -> SQLite.Blob {
-        return asData().asSQLite()
-    }
-}
 
 

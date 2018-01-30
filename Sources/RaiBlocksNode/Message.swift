@@ -3,7 +3,7 @@ import RaiBlocksBasic
 import RaiBlocksSocket
 
 public enum Message {
-    public enum Kind : UInt8, DataWritable {
+    public enum Kind : UInt8, DataWritable, DataReadable {
         case invalid = 0
         case notAKind
         case keepalive
@@ -14,12 +14,20 @@ public enum Message {
         case bulkPush
         case accountRequest
         
+        public init(from reader: DataReader) throws {
+            let rawValue = try reader.read(UInt8.self)
+            guard let x = Kind(rawValue: rawValue) else {
+                throw GenericError(message: "invalid rawValue: \(rawValue)")
+            }
+            self = x
+        }
+        
         public func write(to writer: DataWriter) {
             writer.write(rawValue)
         }
     }
     
-    public struct Header : DataWritable {
+    public struct Header : DataWritable, DataReadable {
         public var magicNumber: UInt16
         public var versionMax: UInt8
         public var versionUsing: UInt8
@@ -37,6 +45,15 @@ public enum Message {
             self.extensions = 0
         }
         
+        public init(from reader: DataReader) throws {
+            self.magicNumber = try reader.read(UInt16.self, from: .big)
+            self.versionMax = try reader.read(UInt8.self)
+            self.versionUsing = try reader.read(UInt8.self)
+            self.versionMin = try reader.read(UInt8.self)
+            self.kind = try reader.read(Kind.self)
+            self.extensions = try reader.read(UInt16.self, from: .big)
+        }
+        
         public var ipv4Only: Bool {
             get {
                 return (extensions & Header.ipv4OnlyMask) != 0
@@ -50,14 +67,17 @@ public enum Message {
             }
         }
         
-        public var blockKind: Block.Kind {
+        public var blockKind: Block.Kind? {
             get {
-                let value = (extensions & Header.blockKindMask) >> 8
-                return Block.Kind(rawValue: UInt8(value))!
+                let value = UInt8((extensions & Header.blockKindMask) >> 8)
+                if value == 0 {
+                    return nil
+                }
+                return Block.Kind(rawValue: value)!
             }
             set {
                 extensions &= ~Header.blockKindMask
-                extensions |= (UInt16(newValue.rawValue) << 8)
+                extensions |= (UInt16(newValue?.rawValue ?? 0) << 8)
             }
         }
         
@@ -78,65 +98,81 @@ public enum Message {
         public static let blockKindMask: UInt16 = 0x0F00
     }
     
-    public struct Keepalive : DataWritable {
-        public let header: Header
-        public let endPoints: [EndPoint]
+    public struct Keepalive : MessageProtocol {        
+        public let endPoints: [IPv6.EndPoint]
         
-        public init(endPoints: [EndPoint]) {
-            self.header = .init(kind: .keepalive)
+        public let blockKind: Block.Kind? = nil
+        
+        public init(endPoints: [IPv6.EndPoint]) {
             self.endPoints = endPoints
             
             precondition(endPoints.count <= 8)
         }
         
+        public init(from reader: DataReader) throws {
+            var endPoints: [IPv6.EndPoint] = []
+            for _ in 0..<8 {
+                let endPoint = try reader.read(IPv6.EndPoint.self)
+                endPoints.append(endPoint)
+            }
+            self.endPoints = endPoints
+        }
+        
         public func write(to writer: DataWriter) {
-            writer.write(header)
             let n = min(8, endPoints.count)
             for i in 0..<n {
-                writer.write(endPoints[i].toV6())
+                writer.write(endPoints[i])
             }
             for _ in n..<8 {
-                writer.write(IPv6.EndPoint())
+                writer.write(IPv6.EndPoint.zero)
             }
         }
+        
+        public static var kind: Message.Kind = .keepalive
     }
     
-    public struct Publish : DataWritable {
-        public let header: Header
+    public struct Publish : MessageProtocol {
         public let block: Block
         
+        public var blockKind: Block.Kind? {
+            return block.kind
+        }
+        
         public init(block: Block) {
-            var header = Header(kind: .publish)
-            header.blockKind = block.kind
-            self.header = header
             self.block = block
         }
         
+        public init(from reader: DataReader, blockKind: Block.Kind) throws {
+            self.block = try Block.init(from: reader, kind: blockKind)
+        }
+        
         public func write(to writer: DataWriter) {
-            writer.write(header)
             writer.write(block)
         }
+        
+        public static let kind: Message.Kind = .publish
     }
     
-    public struct AccountRequest : DataWritable {
-        public var header: Header
+    public struct AccountRequest : MessageProtocol {
         public var start: Account.Address?
         public var age: UInt32
         public var count: UInt32
         
+        public let blockKind: Block.Kind? = nil
+        
         public init() {
-            self.header = .init(kind: .accountRequest)
             self.start = nil
             self.age = 0
             self.count = 0
         }
         
         public func write(to writer: DataWriter) {
-            writer.write(header)
             writer.write(start ?? .zero)
             writer.write(age, byteOrder: .little)
             writer.write(count, byteOrder: .little)
         }
+        
+        public static let kind: Message.Kind = .accountRequest
     }
     
     public struct AccountResponseEntry : DataReadable {
@@ -155,6 +191,7 @@ public enum Message {
             }
         }
     }
+    
 }
 
 
