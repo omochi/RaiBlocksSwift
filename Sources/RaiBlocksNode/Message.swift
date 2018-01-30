@@ -79,12 +79,14 @@ public enum Message {
     }
     
     public struct Keepalive : DataWritable {
-        public var header: Header
-        public var endPoints: [EndPoint]
+        public let header: Header
+        public let endPoints: [EndPoint]
         
         public init(endPoints: [EndPoint]) {
             self.header = .init(kind: .keepalive)
             self.endPoints = endPoints
+            
+            precondition(endPoints.count <= 8)
         }
         
         public func write(to writer: DataWriter) {
@@ -96,6 +98,23 @@ public enum Message {
             for _ in n..<8 {
                 writer.write(IPv6.EndPoint())
             }
+        }
+    }
+    
+    public struct Publish : DataWritable {
+        public let header: Header
+        public let block: Block
+        
+        public init(block: Block) {
+            var header = Header(kind: .publish)
+            header.blockKind = block.kind
+            self.header = header
+            self.block = block
+        }
+        
+        public func write(to writer: DataWriter) {
+            writer.write(header)
+            writer.write(block)
         }
     }
     

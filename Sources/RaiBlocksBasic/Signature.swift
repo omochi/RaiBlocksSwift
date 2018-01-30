@@ -1,10 +1,14 @@
 import Foundation
 
-public struct Signature : DataConvertible {
+public struct Signature : DataWritable {
     public init(data: Data) {
         precondition(data.count == Signature.size)
         
         self._data = data
+    }
+    
+    public func write(to writer: DataWriter) {
+        writer.write(data: _data)
     }
 
     public func asData() -> Data {
@@ -12,7 +16,9 @@ public struct Signature : DataConvertible {
     }
     
     public static let size: Int = 64
-        
+    
+    public static let zero: Signature = .init(data: .init(count: size))
+    
     private let _data: Data
 }
 

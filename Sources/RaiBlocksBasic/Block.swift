@@ -2,7 +2,7 @@ import Foundation
 import SQLite
 
 public enum Block {
-    public struct Hash : DataConvertible, DataWritable, DataReadable {
+    public struct Hash : DataWritable, DataReadable {
         public init(data: Data) {
             precondition(data.count == Hash.size)
             
@@ -194,3 +194,62 @@ public enum Block {
     case change(Change)
 }
 
+extension Block {
+    public var kind: Block.Kind {
+        switch self {
+        case .send: return .send
+        case .receive: return .receive
+        case .open: return .open
+        case .change: return .change
+        }
+    }
+}
+
+extension Block.Send : DataWritable {
+    public func write(to writer: DataWriter) {
+        writer.write(previous)
+        writer.write(destination)
+        writer.write(balance)
+        writer.write(signature ?? .zero)
+        writer.write(work ?? .zero)
+    }
+}
+
+extension Block.Receive : DataWritable {
+    public func write(to writer: DataWriter) {
+        writer.write(previous)
+        writer.write(source)
+        writer.write(signature ?? .zero)
+        writer.write(work ?? .zero)
+    }
+}
+
+extension Block.Open : DataWritable {
+    public func write(to writer: DataWriter) {
+        writer.write(source)
+        writer.write(representative)
+        writer.write(account)
+        writer.write(signature ?? .zero)
+        writer.write(work ?? .zero)
+    }
+}
+
+extension Block.Change : DataWritable {
+    public func write(to writer: DataWriter) {
+        writer.write(previous)
+        writer.write(representative)
+        writer.write(signature ?? .zero)
+        writer.write(work ?? .zero)
+    }
+}
+
+extension Block : DataWritable {
+    public func write(to writer: DataWriter) {
+        switch self {
+        case .send(let b): writer.write(b)
+        case .receive(let b): writer.write(b)
+        case .open(let b): writer.write(b)
+        case .change(let b): writer.write(b)
+        }
+    }
+}

@@ -1,5 +1,6 @@
 import Foundation
 import BigInt
+import SQLite
 
 public class DataWriter {
     public init() {
@@ -56,14 +57,19 @@ public class DataWriter {
 }
 
 public protocol DataWritable {
-    func write(to writer: DataWriter)
+    func write(to writer: DataWriter)    
+    func asData() -> Data
 }
 
 extension DataWritable {
-    public func writeToData() -> Data {
+    public func asData() -> Data {
         let writer = DataWriter()
         self.write(to: writer)
         return writer.data
+    }
+    
+    public func asSQLite() -> SQLite.Blob {
+        return asData().asSQLite()
     }
 }
 

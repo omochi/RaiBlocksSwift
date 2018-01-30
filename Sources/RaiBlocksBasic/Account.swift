@@ -2,7 +2,7 @@ import Foundation
 import BigInt
 
 public class Account : CustomStringConvertible {
-    public struct Address : DataConvertible, DataWritable, DataReadable {
+    public struct Address : DataWritable, DataReadable {
         public init(data: Data) {
             precondition(data.count == Address.size, "data must be \(Address.size) bytes")
             
@@ -10,7 +10,7 @@ public class Account : CustomStringConvertible {
         }
 
         public init(from reader: DataReader) throws {
-            let data = try reader.read(Data.self, size: 32)
+            let data = try reader.read(Data.self, size: Address.size)
             self.init(data: data)
         }
         
