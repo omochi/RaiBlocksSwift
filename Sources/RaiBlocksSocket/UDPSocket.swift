@@ -2,6 +2,12 @@ import Foundation
 import RaiBlocksPosix
 
 public class UDPSocket {
+    public enum State {
+        case inited
+        case opened
+        case closed
+    }
+    
     public convenience init(callbackQueue: DispatchQueue) {
         let impl = Impl.init(callbackQueue: callbackQueue)
         self.init(impl: impl)
@@ -9,6 +15,10 @@ public class UDPSocket {
     
     deinit {
         close()
+    }
+    
+    public var state: State {
+        return impl.state
     }
     
     public func getLocalEndPoint() throws -> EndPoint {
@@ -46,29 +56,33 @@ public class UDPSocket {
             self.queue = DispatchQueue.init(label: "UDPSocket.Impl.queue")
             self.callbackQueue = callbackQueue
             
-            self.state = .inited
+            self._state = .inited
+        }
+        
+        public var state: State {
+            return queue.sync { _state }
         }
         
         public func close() {
             queue.sync {
-                if state == .closed {
+                if _state == .closed {
                     return
                 }
                 
                 _close()
-                state = .closed
+                _state = .closed
             }
         }
         
         public func open(protocolFamily: ProtocolFamily) throws {
             try queue.sync {
-                precondition(state == .inited)
+                precondition(_state == .inited)
                 
                 let _ = try initSocket {
                     try RawDispatchSocket(protocolFamily: protocolFamily, type: SOCK_DGRAM, queue: queue)
                 }
                 
-                state = .opened
+                _state = .opened
             }
         }
         
@@ -78,7 +92,7 @@ public class UDPSocket {
                          errorHandler: @escaping (Error) -> Void)
         {
             queue.sync {
-                precondition(state == .opened)
+                precondition(_state == .opened)
                 precondition(sendTask == nil)
                 
                 let socket = self.socket!
@@ -99,7 +113,7 @@ public class UDPSocket {
                             errorHandler: @escaping (Error) -> Void)
         {
             queue.sync {
-                precondition(state == .opened)
+                precondition(_state == .opened)
                 precondition(receiveTask == nil)
                 
                 let socket = self.socket!
@@ -121,14 +135,14 @@ public class UDPSocket {
         }
         
         private func initSocket(_ socketFactory: () throws -> RawDispatchSocket) rethrows -> RawDispatchSocket {
-            precondition(state == .inited)
+            precondition(_state == .inited)
             precondition(self.socket == nil)
             
             let socket = try socketFactory()
             self.socket = socket
             
             socket.setReadHandler {
-                switch self.state {
+                switch self._state {
                 case .opened:
                     self.doReceive()
                 default:
@@ -137,7 +151,7 @@ public class UDPSocket {
             }
             
             socket.setWriteHandler {
-                switch self.state {
+                switch self._state {
                 case .opened:
                     self.doSend()
                 default:
@@ -221,7 +235,7 @@ public class UDPSocket {
         {
             _close()
             postCallback {
-                self.state = .closed
+                self._state = .closed
                 return { handler(error) }
             }
         }
@@ -229,7 +243,7 @@ public class UDPSocket {
         private func postCallback(_ f: @escaping () -> () -> Void) {
             callbackQueue.async {
                 let next: () -> Void = self.queue.sync {
-                    if self.state == .closed {
+                    if self._state == .closed {
                         return {}
                     }
                     return f()
@@ -241,19 +255,13 @@ public class UDPSocket {
         private let queue: DispatchQueue
         private let callbackQueue: DispatchQueue
         
-        private var state: State
+        private var _state: State
         private var socket: RawDispatchSocket?
         
         private var sendTask: SendTask?
         private var receiveTask: ReceiveTask?
     }
-    
-    private enum State {
-        case inited
-        case opened
-        case closed
-    }
-    
+
     private class SendTask {
         public var data: Data
         public let endPoint: EndPoint

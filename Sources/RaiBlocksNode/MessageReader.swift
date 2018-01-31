@@ -2,10 +2,13 @@ import Foundation
 import RaiBlocksBasic
 
 public class MessageReader {
-    public func read(data: Data) throws -> (Message.Header, Message?) {
+    public init() {
+    }
+    
+    public func read(data: Data) throws -> (Message.Header, Message) {
         let reader = DataReader(data: data)
         let header = try Message.Header(from: reader)
-        let message: Message?
+        let message: Message
         switch header.kind {
         case .invalid, .notAKind:
             throw GenericError(message: "invalid message kind: \(header.kind)")
@@ -18,8 +21,7 @@ public class MessageReader {
             let blockKind = try header.blockKind.unwrap(or: "block kind for confirmRequest is none")
             message = .confirmRequest(try Message.ConfirmRequest(from: reader, blockKind: blockKind))
         case .confirmAck, .bulkPull, .bulkPush:
-            print("[TODO] unsupported message: \(header.kind)")
-            message = nil
+            throw GenericError(message: "[TODO] unsupported message: \(header.kind)")
         case .accountRequest:
             message = .accountRequest(try Message.AccountRequest(from: reader))
         }
