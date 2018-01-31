@@ -8,7 +8,7 @@ public class UDPSocket {
     }
     
     deinit {
-        impl.close()
+        close()
     }
     
     public func getLocalEndPoint() throws -> EndPoint {
@@ -17,6 +17,10 @@ public class UDPSocket {
     
     public func open(protocolFamily: ProtocolFamily) throws {
         try impl.open(protocolFamily: protocolFamily)
+    }
+    
+    public func close() {
+        impl.close()
     }
     
     public func send(data: Data,

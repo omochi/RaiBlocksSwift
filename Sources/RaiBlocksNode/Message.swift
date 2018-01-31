@@ -8,7 +8,7 @@ public enum Message {
         case notAKind
         case keepalive
         case publish
-        case confirmReq
+        case confirmRequest
         case confirmAck
         case bulkPull
         case bulkPush
@@ -143,7 +143,7 @@ public enum Message {
         }
         
         public init(from reader: DataReader, blockKind: Block.Kind) throws {
-            self.block = try Block.init(from: reader, kind: blockKind)
+            self.block = try Block(from: reader, kind: blockKind)
         }
         
         public func write(to writer: DataWriter) {
@@ -151,6 +151,28 @@ public enum Message {
         }
         
         public static let kind: Message.Kind = .publish
+    }
+    
+    public struct ConfirmRequest : MessageProtocol {
+        public let block: Block
+        
+        public var blockKind: Block.Kind? {
+            return block.kind
+        }
+
+        public init(block: Block) {
+            self.block = block
+        }
+
+        public init(from reader: DataReader, blockKind: Block.Kind) throws {
+            self.block = try Block(from: reader, kind: blockKind)
+        }
+        
+        public func write(to writer: DataWriter) {
+            writer.write(block)
+        }
+        
+        public static let kind: Message.Kind = .confirmRequest
     }
     
     public struct AccountRequest : MessageProtocol {
@@ -166,6 +188,15 @@ public enum Message {
             self.count = 0
         }
         
+        public init(from reader: DataReader) throws {
+            start = try reader.read(Account.Address.self)
+            if start == .zero {
+                start = nil
+            }
+            age = try reader.read(UInt32.self, from: .little)
+            count = try reader.read(UInt32.self, from: .little)
+        }
+        
         public func write(to writer: DataWriter) {
             writer.write(start ?? .zero)
             writer.write(age, byteOrder: .little)
@@ -175,7 +206,7 @@ public enum Message {
         public static let kind: Message.Kind = .accountRequest
     }
     
-    public struct AccountResponseEntry : DataReadable {
+    public struct AccountResponseEntry {
         public var account: Account.Address?
         public var headBlock: Block.Hash?
         
@@ -192,6 +223,11 @@ public enum Message {
         }
     }
     
+    case keepalive(Keepalive)
+    case publish(Publish)
+    case confirmRequest(ConfirmRequest)
+    // TODO
+    case accountRequest(AccountRequest)
 }
 
 

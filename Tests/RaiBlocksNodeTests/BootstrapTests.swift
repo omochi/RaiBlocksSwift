@@ -8,7 +8,8 @@ class BootstrapTests: XCTestCase {
     func test1() throws {
         let exp = self.expectation(description: "")
         
-        let client = BootstrapClient.init(callbackQueue: .main)
+        let client = BootstrapClient.init(messageWriter: MessageWriter(),
+                                          callbackQueue: .main)
         
         func errorHandler(error: Error) {
             XCTFail(String(describing: error))

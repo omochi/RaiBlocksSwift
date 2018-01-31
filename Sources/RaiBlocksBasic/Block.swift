@@ -38,7 +38,7 @@ public enum Block {
         case change = 5
     }
     
-    public class Send : BlockProtocol {
+    public struct Send : BlockProtocol {
         public let previous: Block.Hash
         public let destination: Account.Address
         public let balance: Amount
@@ -58,7 +58,7 @@ public enum Block {
             self.work = work
         }
         
-        public required init(from reader: DataReader) throws {
+        public init(from reader: DataReader) throws {
             previous = try reader.read(Block.Hash.self)
             destination = try reader.read(Account.Address.self)
             balance = try reader.read(Amount.self)
@@ -91,7 +91,7 @@ public enum Block {
         public static let kind: Kind = .send
     }
     
-    public class Receive : BlockProtocol {
+    public struct Receive : BlockProtocol {
         public let previous: Block.Hash
         public let source: Block.Hash
         public var signature: Signature?
@@ -108,7 +108,7 @@ public enum Block {
             self.work = work
         }
         
-        public required init(from reader: DataReader) throws {
+        public init(from reader: DataReader) throws {
             previous = try reader.read(Block.Hash.self)
             source = try reader.read(Block.Hash.self)
             try self.readSuffix(from: reader)
@@ -137,7 +137,7 @@ public enum Block {
         public static let kind: Kind = .receive
     }
     
-    public class Open : BlockProtocol {
+    public struct Open : BlockProtocol {
         public let source: Block.Hash
         public let representative: Account.Address
         public var account: Account.Address
@@ -157,7 +157,7 @@ public enum Block {
             self.work = work
         }
         
-        public required init(from reader: DataReader) throws {
+        public init(from reader: DataReader) throws {
             source = try reader.read(Block.Hash.self)
             representative = try reader.read(Account.Address.self)
             account = try reader.read(Account.Address.self)
@@ -190,7 +190,7 @@ public enum Block {
         public static let kind: Kind = .open
     }
     
-    public class Change : BlockProtocol {
+    public struct Change : BlockProtocol {
         public let previous: Block.Hash
         public let representative: Account.Address
         public var signature: Signature?
@@ -207,7 +207,7 @@ public enum Block {
             self.work = work
         }
         
-        public required init(from reader: DataReader) throws {
+        public init(from reader: DataReader) throws {
             previous = try reader.read(Block.Hash.self)
             representative = try reader.read(Account.Address.self)
             try self.readSuffix(from: reader)
