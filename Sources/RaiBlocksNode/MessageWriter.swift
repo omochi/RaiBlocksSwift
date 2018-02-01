@@ -13,4 +13,13 @@ public class MessageWriter {
         writer.write(message)
         return writer.data
     }
+    
+    public func write(message: Message) -> Data {
+        switch message {
+        case .keepalive(let m): return write(message: m)
+        case .publish(let m): return write(message: m)
+        case .confirmRequest(let m): return write(message: m)
+        case .accountRequest(let m): return write(message: m)
+        }
+    }
 }

@@ -29,13 +29,24 @@ public enum Block {
         private let _data: Data
     }
     
-    public enum Kind : UInt8 {
+    public enum Kind : UInt8, CustomStringConvertible {
         case invalid = 0
         case notABlock = 1
         case send = 2
         case receive = 3
         case open = 4
         case change = 5
+        
+        public var description: String {
+            switch self {
+            case .invalid: return "invalid"
+            case .notABlock: return "notABlock"
+            case .send: return "send"
+            case .receive: return "receive"
+            case .open: return "open"
+            case .change: return "change"
+            }
+        }
     }
     
     public struct Send : BlockProtocol {
@@ -67,12 +78,13 @@ public enum Block {
         
         public var description: String {
             let fields = [
+                "hash=\(hash)",
                 "previous=\(previous)",
                 "destination=\(destination)",
                 "balance=\(balance)",
                 "signature=\(signature?.description ?? "")",
                 "work=\(work?.description ?? "")"]
-            return "Block.Send(\(fields.joined(separator: ", ")))"
+            return "Send(\(fields.joined(separator: ", ")))"
         }
         
         public func hash(blake: Blake2B) {
@@ -116,11 +128,12 @@ public enum Block {
         
         public var description: String {
             let fields = [
+                "hash=\(hash)",
                 "previous=\(previous)",
                 "source=\(source)",
                 "signature=\(signature?.description ?? "")",
                 "work=\(work?.description ?? "")"]
-            return "Block.Receive(\(fields.joined(separator: ", ")))"
+            return "Receive(\(fields.joined(separator: ", ")))"
         }
         
         public func hash(blake: Blake2B) {
@@ -166,12 +179,13 @@ public enum Block {
         
         public var description: String {
             let fields = [
+                "hash=\(hash)",
                 "source=\(source)",
                 "representative=\(representative)",
                 "account=\(account)",
                 "signature=\(signature?.description ?? "")",
                 "work=\(work?.description ?? "")"]
-            return "Block.Open(\(fields.joined(separator: ", ")))"
+            return "Open(\(fields.joined(separator: ", ")))"
         }
         
         public func hash(blake: Blake2B) {
@@ -215,11 +229,12 @@ public enum Block {
         
         public var description: String {
             let fields = [
+                "hash=\(hash)",
                 "previous=\(previous)",
                 "representative=\(representative)",
                 "signature=\(signature?.description ?? "")",
                 "work=\(work?.description ?? "")"]
-            return "Block.Change(\(fields.joined(separator: ", ")))"
+            return "Change(\(fields.joined(separator: ", ")))"
         }
         
         public func hash(blake: Blake2B) {
@@ -240,7 +255,6 @@ public enum Block {
     case receive(Receive)
     case open(Open)
     case change(Change)
-
 }
 
 extension Block {
@@ -250,6 +264,17 @@ extension Block {
         case .receive: return .receive
         case .open: return .open
         case .change: return .change
+        }
+    }
+}
+
+extension Block : CustomStringConvertible {
+    public var description: String {
+        switch self {
+        case .send(let b): return b.description
+        case .receive(let b): return b.description
+        case .open(let b): return b.description
+        case .change(let b): return b.description
         }
     }
 }

@@ -8,7 +8,7 @@
 import XCTest
 import RaiBlocksSocket
 
-class NetworkTests: XCTestCase {
+class NameResolveTests: XCTestCase {
 
     func testNameResolve1() {
         let exp = self.expectation(description: "")

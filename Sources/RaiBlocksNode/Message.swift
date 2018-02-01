@@ -27,7 +27,7 @@ public enum Message {
         }
     }
     
-    public struct Header : DataWritable, DataReadable {
+    public struct Header : CustomStringConvertible, DataWritable, DataReadable {
         public var magicNumber: UInt16
         public var versionMax: UInt8
         public var versionUsing: UInt8
@@ -51,7 +51,25 @@ public enum Message {
             self.versionUsing = try reader.read(UInt8.self)
             self.versionMin = try reader.read(UInt8.self)
             self.kind = try reader.read(Kind.self)
-            self.extensions = try reader.read(UInt16.self, from: .big)
+            self.extensions = try reader.read(UInt16.self, from: .little)
+        }
+        
+        public var description: String {
+            var extFields = [String]()
+            if ipv4Only {
+                extFields.append("ipv4Only")
+            }
+            if let blockKind = self.blockKind {
+                extFields.append("blockKind=\(blockKind)")
+            }
+            
+            let fields = [
+                "magicNumber=\(String(format: "%04x", magicNumber))",
+                "version=(max=\(versionMax), using=\(versionUsing), min=\(versionMin))",
+                "kind=\(kind)",
+                "extensions=(\(String(format: "%04x", extensions)): \(extFields.joined(separator: ", ")))",
+                ]
+            return "Header(\(fields.joined(separator: ", ")))"
         }
         
         public var ipv4Only: Bool {
@@ -87,7 +105,7 @@ public enum Message {
             writer.write(versionUsing)
             writer.write(versionMin)
             writer.write(kind)
-            writer.write(extensions, byteOrder: .big)
+            writer.write(extensions, byteOrder: .little)
         }
         
         public static let ipv4OnlyBitIndex: Int = 1
@@ -118,6 +136,10 @@ public enum Message {
             self.endPoints = endPoints
         }
         
+        public var description: String {
+            return "Keepalive(endPoints=\(endPoints))"
+        }
+        
         public func write(to writer: DataWriter) {
             let n = min(8, endPoints.count)
             for i in 0..<n {
@@ -127,7 +149,7 @@ public enum Message {
                 writer.write(IPv6.EndPoint.zero)
             }
         }
-        
+
         public static var kind: Message.Kind = .keepalive
     }
     
@@ -146,10 +168,14 @@ public enum Message {
             self.block = try Block(from: reader, kind: blockKind)
         }
         
+        public var description: String {
+            return "Publish(\(block))"
+        }
+        
         public func write(to writer: DataWriter) {
             writer.write(block)
         }
-        
+
         public static let kind: Message.Kind = .publish
     }
     
@@ -166,6 +192,10 @@ public enum Message {
 
         public init(from reader: DataReader, blockKind: Block.Kind) throws {
             self.block = try Block(from: reader, kind: blockKind)
+        }
+        
+        public var description: String {
+            return "ConfirmRequest(\(block))"
         }
         
         public func write(to writer: DataWriter) {
@@ -195,6 +225,10 @@ public enum Message {
             }
             age = try reader.read(UInt32.self, from: .little)
             count = try reader.read(UInt32.self, from: .little)
+        }
+        
+        public var description: String {
+            return "AccountRequest(start=\(start?.description ?? ""), age=\(age), count=\(count))"
         }
         
         public func write(to writer: DataWriter) {
@@ -230,6 +264,16 @@ public enum Message {
     case accountRequest(AccountRequest)
 }
 
+extension Message : CustomStringConvertible {
+    public var description: String {
+        switch self {
+        case .keepalive(let m): return m.description
+        case .publish(let m): return m.description
+        case .confirmRequest(let m): return m.description
+        case .accountRequest(let m): return m.description
+        }
+    }
+}
 
 
 

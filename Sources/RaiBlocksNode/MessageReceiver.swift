@@ -3,78 +3,68 @@ import RaiBlocksSocket
 import RaiBlocksBasic
 
 public class MessageReceiver {
-    public typealias Handler = (EndPoint, Message.Header, Message, () -> Void) -> Void
+    public typealias Handler = (EndPoint, Message.Header, Message, @escaping () -> Void) -> Void
     
     public init(queue: DispatchQueue,
-                logger: Logger) {
+                logger: Logger,
+                socket: UDPSocket,
+                handler: @escaping Handler,
+                errorHandler: @escaping (Error) -> Void)
+    {
         self.queue = queue
-        self.messageReader = MessageReader()
         self.logger = Logger(config: logger.config, tag: "MessageReceiver")
-        
-        let socket = UDPSocket(callbackQueue: queue)
+        self.messageReader = MessageReader()
         self.socket = socket
-    }
-    
-    public func terminate() {
-        logger.trace("terminate")
-        
-        receiveRestartTimer?.cancel()
-        receiveRestartTimer = nil
-        
-        socket.close()
-    }
-    
-    public func start(handler: @escaping Handler) throws {
         self.handler = handler
-        
-        try socket.open(protocolFamily: .ipv4)
-        
+        self.errorHandler = errorHandler
+        self.terminated = false
         receive()
     }
     
-    private var _terminated: Bool {
-        return socket.state == .closed
+    public func terminate() {
+        terminated = true
     }
     
     private func receive() {
         logger.trace("receive")
         
         func next() {
-            queue.async {
-                if self._terminated {
-                    self.logger.trace("receive.exit: terminated")
-                    return
-                }
-                
-                self.receive()
+            if self.terminated {
+                self.logger.trace("receive.exit: terminated")
+                return
             }
+            
+            self.receive()
         }
         
         socket.receive(size: 2048,
                        successHandler: { (data, endPoint) in
+                        if self.terminated { return }
+                        
                         do {
                             let (header, message) = try self.messageReader.read(data: data)
-                            self.logger.debug("message: header=[\(header)], message=[\(message)]")
+                            self.logger.debug("message: endPoint=\(endPoint), header=\(header), message=\(message)")
                             
-                            self.handler!(endPoint, header, message, next)
+                            self.handler(endPoint, header, message, next)
                         } catch let error {
                             self.logger.debug("message read error: \(error)")
+//                            self.logger.debug("data=\(data.toHex())")
                             next()
                         }
         },
                        errorHandler: { (error) in
+                        if self.terminated { return }
+                        
                         self.logger.error("socket.receive error: \(error)")
-                        self.receiveRestartTimer = makeTimer(delay: 1.0, queue: self.queue) {
-                            next()
-                        }
+                        self.errorHandler(error)
         })
     }
     
     private let queue: DispatchQueue
-    private let messageReader: MessageReader
     private let logger: Logger
+    private let messageReader: MessageReader
     private let socket: UDPSocket
-    private var receiveRestartTimer: DispatchSourceTimer?
-    
-    private var handler: Handler?
+    private let handler: Handler
+    private let errorHandler: ((Error) -> Void)
+    private var terminated: Bool
 }

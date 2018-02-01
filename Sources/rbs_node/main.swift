@@ -27,7 +27,7 @@ func main() {
     
     func loop() {
         let x = getchar()
-        logger.trace("\(x)")
+        logger.trace("loop.getchar: \(x)")
         
         mainQueue.async {
             loop()
