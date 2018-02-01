@@ -60,13 +60,19 @@ public class Logger {
             return
         }
         
-        var str = "[" + level.description + "]"
+        var tags: [String] = []
+        tags.append(level.description)
         if let tag = self.tag {
-            str += " [" + tag + "]"
+            tags.append(tag)
         }
-        str += " " + message
-        
-        Swift.print(str)
+        log(tags: tags, message)
+    }
+    
+    private func log(tags: [String], _ message: String) {
+        var strs = tags.map { "[\($0)]" }
+        strs.append(message)
+        let line = strs.joined(separator: " ")
+        Swift.print(line)
     }
     
 }

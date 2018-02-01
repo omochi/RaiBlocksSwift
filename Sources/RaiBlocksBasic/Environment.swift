@@ -10,10 +10,13 @@ import RaiBlocksRandom
 
 public class Environment {
     public init(dataDir: FilePath,
-                tempDir: FilePath)
+                tempDir: FilePath) throws
     {
         self.dataDir = dataDir
         self.tempDir = tempDir
+        
+        try dataDir.createDirectory(intermediates: true)
+        try tempDir.createDirectory(intermediates: true)
     }
     
     public let dataDir: FilePath
@@ -25,19 +28,25 @@ public class Environment {
         return dir
     }
     
+    public static func createDefault() throws -> Environment {
+        let fm = FileManager.default
+        let supportDir = FilePath(url: fm.urls(for: FileManager.SearchPathDirectory.applicationSupportDirectory,
+                                               in: FileManager.SearchPathDomainMask.userDomainMask)[0])
+        let dataDir = supportDir + "RaiBlocksSwift"
+        let tempDir = FilePath(NSTemporaryDirectory()) +
+            String(format: "RaiBlocksSwift/temp-%08x", Random.getUInt32())
+        
+        return try Environment(dataDir: dataDir,
+                               tempDir: tempDir)
+    }
+    
     public static func createTemporary() throws -> Environment {
-        let root = FilePath(NSTemporaryDirectory()) +
+        let rootDir = FilePath(NSTemporaryDirectory()) +
             String(format: "RaiBlocksSwift/temp-env-%08x", Random.getUInt32())
 
-        let dataDir = root + "data"
+        try rootDir.createDirectory(intermediates: true)
         
-        let tempDir = root + "temp"
-
-        try root.createDirectory(intermediates: true)
-        try dataDir.createDirectory(intermediates: false)
-        try tempDir.createDirectory(intermediates: false)
-        
-        return Environment.init(dataDir: dataDir,
-                                tempDir: tempDir)
+        return try Environment.init(dataDir: rootDir + "data",
+                                    tempDir: rootDir + "temp")
     }
 }

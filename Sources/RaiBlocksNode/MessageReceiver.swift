@@ -32,13 +32,17 @@ public class MessageReceiver {
         receive()
     }
     
+    private var _terminated: Bool {
+        return socket.state == .closed
+    }
+    
     private func receive() {
         logger.trace("receive")
         
         func next() {
             queue.async {
-                if self.socket.state == .closed {
-                    self.logger.trace("receive.exit: socket closed")
+                if self._terminated {
+                    self.logger.trace("receive.exit: terminated")
                     return
                 }
                 

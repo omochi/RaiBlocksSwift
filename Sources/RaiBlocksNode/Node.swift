@@ -5,10 +5,11 @@ import Foundation
 
 public class Node {
     public convenience init(environment: Environment,
-                            queue: DispatchQueue) throws {
-        let impl = try Impl(environment: environment,
-                            queue: queue)
-        self.init(impl: impl)
+                            logger: Logger,
+                            queue: DispatchQueue) {
+        self.init(impl: Impl(environment: environment,
+                             logger: logger,
+                             queue: queue))
     }
     
     deinit {
@@ -19,24 +20,37 @@ public class Node {
         impl.terminate()
     }
     
+    public func start() throws {
+        try impl.start()
+    }
+    
     private class Impl {
         public init(environment: Environment,
-                    queue: DispatchQueue) throws
+                    logger: Logger,
+                    queue: DispatchQueue)
         {
             self.environment = environment
             self.queue = queue
-            self.logger = Logger(config: Logger.Config(level: .trace), tag: "Node")
-            self.messageReceiver = MessageReceiver(queue: queue,
-                                                   logger: logger)
+            self.logger = Logger(config: logger.config, tag: "Node")
+            self.messageReceiver = MessageReceiver(queue: queue, logger: logger)
             
-            try messageReceiver.start { (endPoint, header, message, next) in
-                self.logger.debug("\(endPoint), \(header), \(message)")
-                next()
-            }
+            logger.debug("dataDir: \(environment.dataDir)")
+            logger.debug("tempDir: \(environment.tempDir)")
         }
         
         public func terminate() {
             messageReceiver.terminate()
+        }
+        
+        public func start() throws {
+            do {
+                try messageReceiver.start { (endPoint, header, message, next) in
+                    self.logger.debug("\(endPoint), \(header), \(message)")
+                    next()
+                }
+            } catch let error {
+                logger.error("\(error)")
+            }
         }
         
         private let queue: DispatchQueue
