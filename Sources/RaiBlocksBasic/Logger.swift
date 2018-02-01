@@ -30,6 +30,11 @@ public class Logger {
     public init(config: Config, tag: String? = nil) {
         self.config = config
         self.tag = tag
+        
+        dateFormatter = DateFormatter.init()
+        dateFormatter.locale = Locale.init(identifier: "en_US_POSIX")
+        dateFormatter.timeZone = TimeZone.current
+        dateFormatter.dateFormat = "yyyy/MM/dd HH:mm:ss.SSS"
     }
     
     public var config: Config
@@ -60,12 +65,20 @@ public class Logger {
             return
         }
         
-        var tags: [String] = []
+        let timeTag = self.timeTag()
+        
+        var tags: [String] = []        
+        tags.append(timeTag)
         tags.append(level.description)
         if let tag = self.tag {
             tags.append(tag)
         }
         log(tags: tags, message)
+    }
+    
+    private func timeTag() -> String {
+        let now = Date.init()
+        return dateFormatter.string(from: now)
     }
     
     private func log(tags: [String], _ message: String) {
@@ -75,5 +88,6 @@ public class Logger {
         Swift.print(line)
     }
     
+    private let dateFormatter: DateFormatter
 }
 
