@@ -71,10 +71,27 @@ extension IPv4.EndPoint : CustomStringConvertible {
     }
 }
 
+extension IPv4.Address : Hashable {
+    public var hashValue: Int {
+        var x = 1
+        x = x &* 31 &+ addr.s_addr.hashValue
+        return x
+    }
+}
+
 extension IPv4.EndPoint : Equatable {}
 
 public func ==(a: IPv4.EndPoint, b: IPv4.EndPoint) -> Bool {
     return a.address == b.address && a.port == b.port
+}
+
+extension IPv4.EndPoint : Hashable {
+    public var hashValue: Int {
+        var x = 1
+        x = x &* 31 &+ address.hashValue
+        x = x &* 31 &+ port.hashValue
+        return x
+    }
 }
 
 extension IPv4.EndPoint {

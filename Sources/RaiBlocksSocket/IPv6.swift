@@ -79,6 +79,17 @@ public func ==(a: IPv6.Address, b: IPv6.Address) -> Bool {
     return a.addr.__u6_addr.__u6_addr32 == b.addr.__u6_addr.__u6_addr32
 }
 
+extension IPv6.Address : Hashable {
+    public var hashValue: Int {
+        var x = 1
+        x = x &* 31 &+ addr.__u6_addr.__u6_addr32.0.hashValue
+        x = x &* 31 &+ addr.__u6_addr.__u6_addr32.1.hashValue
+        x = x &* 31 &+ addr.__u6_addr.__u6_addr32.2.hashValue
+        x = x &* 31 &+ addr.__u6_addr.__u6_addr32.3.hashValue
+        return x
+    }
+}
+
 extension IPv6.EndPoint : CustomStringConvertible {
     public var description: String {
         return "[\(address)]:\(port)"
@@ -89,6 +100,15 @@ extension IPv6.EndPoint : Equatable {}
 
 public func ==(a: IPv6.EndPoint, b: IPv6.EndPoint) -> Bool {
     return a.address == b.address && a.port == b.port
+}
+
+extension IPv6.EndPoint : Hashable {
+    public var hashValue: Int {
+        var x = 1
+        x = x &* 31 &+ address.hashValue
+        x = x &* 31 &+ port.hashValue
+        return x
+    }
 }
 
 extension IPv6.EndPoint {

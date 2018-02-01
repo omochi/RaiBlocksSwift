@@ -14,7 +14,7 @@ public class NodeImpl {
         self.config = config
         self.terminated = false
         
-        self.peers = []
+        self.peers = [:]
         
         logger.debug("environment: \(environment)")
         logger.debug("config: \(config)")
@@ -37,22 +37,22 @@ public class NodeImpl {
                                             self.handleMessage(endPoint: $0, header: $1, message: $2, next: $3)
         },
                                           errorHandler: { _ in
-                                            self.restartAfterWait()
+                                            self.startRecovery()
         })
         
         messageSender = MessageSender(queue: queue, logger: logger, socket: socket,
                                       errorHandler: { _ in
-                                        self.restartAfterWait()
+                                        self.startRecovery()
         })
         
-        startInitialPeerNameResolve()
+        refresh()
     }
     
     private func reset() {
         logger.trace("reset")
         
-        restartTimer?.cancel()
-        restartTimer = nil
+        recoveryTimer?.cancel()
+        recoveryTimer = nil
         
         messageReceiver?.terminate()
         messageReceiver = nil
@@ -62,6 +62,9 @@ public class NodeImpl {
         
         socket?.close()
         socket = nil
+        
+        refreshTimer?.cancel()
+        refreshTimer = nil
 
         initialPeerResolver?.terminate()
         initialPeerResolver = nil
@@ -69,29 +72,54 @@ public class NodeImpl {
         self.peers.removeAll()
     }
     
-    private func restartAfterWait() {
-        if restartTimer != nil { return }
+    private func startRecovery() {
+        if recoveryTimer != nil { return }
         
         reset()
         
-        logger.debug("restart")
+        logger.debug("recovery")
 
-        restartTimer = makeTimer(delay: config.recoveryInterval, queue: queue) {
+        recoveryTimer = makeTimer(delay: config.recoveryInterval, queue: queue) {
             if self.terminated { return }
             
-            self.restartTimer = nil
+            self.recoveryTimer = nil
             
             do {
                 try self.start()
             } catch let error {
                 self.logger.error("start error: \(error)")
-                self.restartAfterWait()
+                self.startRecovery()
             }
         }
     }
     
+    private func scheduleRefresh() {
+        refreshTimer?.cancel()
+        
+        refreshTimer = makeTimer(delay: config.refreshInterval, queue: queue) {
+            if self.terminated { return }
+            
+            self.refreshTimer = nil
+            
+            self.refresh()
+        }
+    }
+    
+    private func refresh() {
+        logger.trace("refresh")
+        
+        let now = Date()
+        removeOfflinePeers(now: now)
+        
+        if peers.isEmpty {
+            startInitialPeerNameResolve()
+        }
+        
+        scheduleRefresh()
+    }
+    
     private func startInitialPeerNameResolve() {
-        precondition(initialPeerResolver == nil)
+        initialPeerResolver?.terminate()
         
         initialPeerResolver = InitialPeerResolver(logger: logger,
                                                   queue: queue,
@@ -111,7 +139,42 @@ public class NodeImpl {
     }
     
     private func onFoundPeerEndPoints(_ endPoints: [EndPoint]) {
+        let oldNum = peers.count
+        let now = Date.init()
+        for endPoint in endPoints {
+            updatePeerLastSeenTime(endPoint: endPoint, time: now)
+        }
         
+        let addNum = peers.count - oldNum
+        if addNum > 0 {
+            logger.info("found new \(addNum) peers: \(peers.count)")
+        }
+    }
+    
+    private func updatePeerLastSeenTime(endPoint: EndPoint, time: Date) {
+        let peer = { () -> Peer in
+            if var peer = peers[endPoint] {
+                peer.lastSeenTime = time
+                return peer
+            } else {
+                return Peer(endPoint: endPoint,
+                            lastSeenTime: time)
+            }
+        }()
+        peers[endPoint] = peer
+    }
+    
+    private func removeOfflinePeers(now: Date) {
+        let oldNum = peers.count
+        for (endPoint, peer) in (peers.map { ($0, $1) }) {
+            if peer.lastSeenTime + config.offlineInterval <= now {
+                peers.removeValue(forKey: endPoint)
+            }
+        }
+        let removeNum = oldNum - peers.count
+        if removeNum > 0 {
+            logger.info("lost \(removeNum) peers: \(peers.count)")
+        }
     }
     
     private func handleMessage(endPoint: EndPoint,
@@ -133,10 +196,12 @@ public class NodeImpl {
     private var messageSender: MessageSender?
     private var socket: UDPSocket?
     
-    private var restartTimer: DispatchSourceTimer?
+    private var recoveryTimer: DispatchSourceTimer?
     
     private var initialPeerResolver: InitialPeerResolver?
-    private var peers: [Peer]
+    private var peers: [EndPoint: Peer]
+    
+    private var refreshTimer: DispatchSourceTimer?
 }
 
 

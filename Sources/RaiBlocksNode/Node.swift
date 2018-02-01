@@ -42,7 +42,6 @@ public class Node {
         try impl.start()
     }
     
-    
     private init(impl: NodeImpl) {
         self.impl = impl
     }

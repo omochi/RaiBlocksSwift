@@ -51,9 +51,17 @@ public class InitialPeerResolver {
                            hostname: hostname,
                            callbackQueue: queue,
                            successHandler: { (endPoints) in
+                            var endPoints = endPoints
+                            
                             self.logger.trace("nameResolve.success: \(endPoints)")
                             self.task?.terminate()
                             self.task = nil
+                            
+                            endPoints = endPoints.map { endPoint in
+                                EndPoint.ipv6(endPoint.toV6())
+                            }
+                            endPoints = Set(endPoints).map { $0 }
+                            
                             self.endPointsHandler(endPoints)
                             self.hostnameIndex += 1
                             self.update()

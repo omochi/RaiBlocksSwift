@@ -10,7 +10,9 @@ func main() {
     func boot() {
         do {
             let environment = try Environment.createDefault()
-            let config = Node.Config()
+            var config = Node.Config()
+            config.refreshInterval = 10
+            config.offlineInterval = 30
             let queue = DispatchQueue.init(label: "node-queue")
             node = Node(environment: environment,
                         logger: logger,

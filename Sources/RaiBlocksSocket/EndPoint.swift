@@ -54,6 +54,21 @@ public func ==(a: EndPoint, b: EndPoint) -> Bool {
     }
 }
 
+extension EndPoint : Hashable {
+    public var hashValue: Int {
+        var x: Int
+        switch self {
+        case .ipv4(let ep):
+            x = 1
+            x = x &* 31 &+ ep.hashValue
+        case .ipv6(let ep):
+            x = 2
+            x = x &* 31 &+ ep.hashValue
+        }
+        return x
+    }
+}
+
 extension EndPoint {
     public var protocolFamily: ProtocolFamily {
         switch self {
