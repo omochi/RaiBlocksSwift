@@ -8,7 +8,7 @@
 import Foundation
 import RaiBlocksRandom
 
-public class Environment {
+public struct Environment {
     public init(dataDir: FilePath,
                 tempDir: FilePath) throws
     {
@@ -19,8 +19,8 @@ public class Environment {
         try tempDir.createDirectory(intermediates: true)
     }
     
-    public let dataDir: FilePath
-    public let tempDir: FilePath
+    public var dataDir: FilePath
+    public var tempDir: FilePath
     
     public func createTempDir() throws -> FilePath {
         let dir = tempDir + String(format: "%08x", Random.getUInt32())

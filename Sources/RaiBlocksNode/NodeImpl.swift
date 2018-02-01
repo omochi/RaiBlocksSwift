@@ -5,15 +5,19 @@ import RaiBlocksBasic
 public class NodeImpl {
     public init(environment: Environment,
                 logger: Logger,
+                config: Node.Config,
                 queue: DispatchQueue)
     {
         self.environment = environment
         self.queue = queue
         self.logger = Logger(config: logger.config, tag: "Node")
+        self.config = config
         self.terminated = false
         
-        logger.debug("dataDir: \(environment.dataDir)")
-        logger.debug("tempDir: \(environment.tempDir)")
+        self.peers = []
+        
+        logger.debug("environment: \(environment)")
+        logger.debug("config: \(config)")
     }
     
     public func terminate() {
@@ -41,11 +45,12 @@ public class NodeImpl {
                                         self.restartAfterWait()
         })
         
-        startNameResolve()
+        startInitialPeerNameResolve()
     }
     
     private func reset() {
         logger.trace("reset")
+        
         restartTimer?.cancel()
         restartTimer = nil
         
@@ -57,12 +62,11 @@ public class NodeImpl {
         
         socket?.close()
         socket = nil
+
+        initialPeerResolver?.terminate()
+        initialPeerResolver = nil
         
-        nameResolveTask?.terminate()
-        nameResolveTask = nil
-        
-        nameResolveRestartTimer?.cancel()
-        nameResolveRestartTimer = nil
+        self.peers.removeAll()
     }
     
     private func restartAfterWait() {
@@ -70,10 +74,9 @@ public class NodeImpl {
         
         reset()
         
-        let wait: TimeInterval = 5.0
-        logger.debug("restart: wait=\(wait)")
+        logger.debug("restart")
 
-        restartTimer = makeTimer(delay: wait, queue: queue) {
+        restartTimer = makeTimer(delay: config.recoveryInterval, queue: queue) {
             if self.terminated { return }
             
             self.restartTimer = nil
@@ -87,64 +90,28 @@ public class NodeImpl {
         }
     }
     
-    private func startNameResolve() {
-        let hostname = "rai.raiblocks.net"
-        logger.debug("nameResolve: \(hostname)")
+    private func startInitialPeerNameResolve() {
+        precondition(initialPeerResolver == nil)
         
-        var task: NameResolveTask!
-        
-        task = nameResolve(protocolFamily: .ipv4,
-                               hostname: hostname,
-                               callbackQueue: queue,
-                               successHandler: { (endPoints) in
-                                guard task === self.nameResolveTask else { return }
-                                
-                                self.logger.debug("\(endPoints)")
-                                self.resetNameResolve()
-                                
-                                guard var endPoint = endPoints.getRandom() else {
-                                    self.logger.error("nameResolve empty")
-                                    self.restartNameResolveAfterWait()
-                                    return
-                                }
-                                
-                                endPoint.port = 7075
-                                
-                                let message = Message.keepalive(.init(endPoints: []))
-                                self.messageSender?.send(endPoints: [endPoint], message: message)
+        initialPeerResolver = InitialPeerResolver(logger: logger,
+                                                  queue: queue,
+                                                  hostnames: config.initialPeerHostnames,
+                                                  recoveryInterval: config.recoveryInterval,
+                                                  endPointsHandler: { endPoints in
+                                                    let endPoints: [EndPoint] = endPoints.map { endPoint in
+                                                        var endPoint: EndPoint = endPoint
+                                                        endPoint.port = self.config.peerPort
+                                                        return endPoint
+                                                    }
+                                                    self.onFoundPeerEndPoints(endPoints)
         },
-                               errorHandler: { error in
-                                guard task === self.nameResolveTask else { return }
-                                
-                                self.logger.error("nameResolve error: \(error)")
-                                self.restartNameResolveAfterWait()
-                                
+                                                  completeHandler: {
+                                             self.initialPeerResolver = nil
         })
-        self.nameResolveTask = task
     }
     
-    private func resetNameResolve() {
-        nameResolveTask?.terminate()
-        nameResolveTask = nil
+    private func onFoundPeerEndPoints(_ endPoints: [EndPoint]) {
         
-        nameResolveRestartTimer?.cancel()
-        nameResolveRestartTimer = nil
-    }
-    
-    private func restartNameResolveAfterWait() {
-        if nameResolveRestartTimer != nil { return }
-        
-        resetNameResolve()
-        
-        let wait: TimeInterval = 5.0
-        logger.debug("restartNameResolve: wait=\(wait)")
-        
-        nameResolveRestartTimer = makeTimer(delay: wait, queue: queue) {
-            if self.terminated { return }
-            self.nameResolveRestartTimer = nil
-            
-            self.startNameResolve()
-        }
     }
     
     private func handleMessage(endPoint: EndPoint,
@@ -155,20 +122,21 @@ public class NodeImpl {
         next()
     }
     
-    
     private let queue: DispatchQueue
     private let environment: Environment
     private let logger: Logger
+    private let config: Node.Config
     
     private var terminated: Bool
     
-    private var nameResolveTask: NameResolveTask?
     private var messageReceiver: MessageReceiver?
     private var messageSender: MessageSender?
     private var socket: UDPSocket?
     
     private var restartTimer: DispatchSourceTimer?
-    private var nameResolveRestartTimer: DispatchSourceTimer?
+    
+    private var initialPeerResolver: InitialPeerResolver?
+    private var peers: [Peer]
 }
 
 

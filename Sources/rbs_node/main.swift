@@ -10,9 +10,11 @@ func main() {
     func boot() {
         do {
             let environment = try Environment.createDefault()
+            let config = Node.Config()
             let queue = DispatchQueue.init(label: "node-queue")
             node = Node(environment: environment,
                         logger: logger,
+                        config: config,
                         queue: queue)
             
             try node!.start()
