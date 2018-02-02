@@ -11,9 +11,9 @@ func main() {
         do {
             let environment = try Environment.createDefault()
             var config = Node.Config()
-            config.refreshInterval = 10
-            config.offlineInterval = 30
-            config.sendingBufferSize = 1
+            config.refreshInterval = 60
+            config.offlineInterval = config.refreshInterval * 5
+            config.sendingBufferSize = 1000 * 1000
             let queue = DispatchQueue.init(label: "node-queue")
             node = Node(environment: environment,
                         logger: logger,

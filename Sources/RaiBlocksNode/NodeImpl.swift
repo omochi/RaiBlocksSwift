@@ -14,7 +14,7 @@ public class NodeImpl {
         self.config = config
         self.terminated = false
         
-        self.peers = [:]
+        self.peerMap = [:]
         self.stats = NodeStats()
         
         logger.debug("environment: \(environment)")
@@ -26,7 +26,7 @@ public class NodeImpl {
         reset()
         terminated = true
     }
-    
+
     public func start() throws {
         let socket = UDPSocket(callbackQueue: queue)
         self.socket = socket
@@ -35,13 +35,9 @@ public class NodeImpl {
         
         messageReceiver = MessageReceiver(queue: queue, logger: logger, socket: socket,
                                           handler: { (endPoint, header, message) in
-                                            let now = Date()
-                                            if let peer = self.getOrAddPeerIfValidEndPoint(endPoint: endPoint.toV6(), now: now) {
-                                                self.updatePeerReceived(peer: peer, now: now)
-                                                self.handleMessage(peer: peer, header: header, message: message, now: now)
-                                            } else {
-                                                self.logger.warn("message received from invalid end point: \(endPoint), \(message)")
-                                            }
+                                            self.handleMessage(endPoint: endPoint,
+                                                               header: header,
+                                                               message: message)
         },
                                           errorHandler: { _ in
                                             self.startRecovery()
@@ -77,7 +73,7 @@ public class NodeImpl {
         initialPeerResolver?.terminate()
         initialPeerResolver = nil
         
-        peers.removeAll()
+        peerMap.removeAll()
         
         stats.clear()
     }
@@ -121,17 +117,21 @@ public class NodeImpl {
         let now = Date()
         removeOfflinePeers(now: now)
         
+        stats.activePeerCount = activePeers.count
         stats.peerCount = peers.count
-        logger.info(stats.description)
+        
+        stats.lines.forEach {
+             logger.info($0)
+        }
+       
         stats.clear()
         
-        if peers.isEmpty {
+        if peerMap.isEmpty {
             startInitialPeerNameResolve()
         } else {
             sendKeepalive(now: now)
         }
 
-        
         scheduleRefresh()
     }
     
@@ -143,6 +143,7 @@ public class NodeImpl {
                                                   hostnames: config.initialPeerHostnames,
                                                   recoveryInterval: config.recoveryInterval,
                                                   endPointsHandler: { endPoints in
+                                                    
                                                     let endPoints: [IPv6.EndPoint] = endPoints.map { endPoint in
                                                         var endPoint: IPv6.EndPoint = endPoint
                                                         endPoint.port = self.config.peerPort
@@ -150,14 +151,10 @@ public class NodeImpl {
                                                     }
                                                     
                                                     let now = Date()
-                                                    endPoints.forEach {
-                                                        let _ = self.getOrAddPeerIfValidEndPoint(endPoint: $0, now: now)
-                                                    }
+                                                    self.handleNotifiedEndPoints(endPoints: endPoints, now: now)
         },
                                                   completeHandler: {
                                                     self.initialPeerResolver = nil
-                                                    let now = Date()
-                                                    self.sendKeepalive(now: now)
         })
     }
     
@@ -200,15 +197,21 @@ public class NodeImpl {
             endPoint = .ipv6(v6ep)
         }
         
-        if let peer = peers[endPoint] {
+        if let peer = peerMap[endPoint] {
             return peer
         }
         
+        return addPeer(endPoint: endPoint, now: now)
+    }
+    
+    private func addPeer(endPoint: EndPoint, now: Date) -> Peer {
+        precondition(peerMap[endPoint] == nil)
+        
         let peer = Peer(endPoint: endPoint, now: now)
-        peers[endPoint] = peer
+        peerMap[endPoint] = peer
         
         stats.peerAddCount += 1
-
+        
         return peer
     }
     
@@ -218,39 +221,50 @@ public class NodeImpl {
     }
     
     private func removeOfflinePeers(now: Date) {
-        for (endPoint, peer) in (peers.map { ($0, $1) }) {
+        for (endPoint, peer) in (peerMap.map { ($0, $1) }) {
             if peer.lastAliveTime + config.offlineInterval <= now {
-                peers.removeValue(forKey: endPoint)
+                peerMap.removeValue(forKey: endPoint)
                 stats.peerRemoveCount += 1
             }
         }
     }
     
     private func sendKeepalive(now: Date) {
-        let dests = peers.values
-            .filter { peer in
-                if let lastReceiveTime = peer.lastReceivedTime {
-                    if now <= lastReceiveTime + config.refreshInterval {
-                        return false
-                    }
-                }
-                
-                if let lastSentTime = peer.lastSentTime {
-                    if now <= lastSentTime + config.refreshInterval {
-                        return false
-                    }
-                }
-                
-                return true
-            }
+        let peers = self.activePeers.filter {
+            self.shouldSendKeepalive(peer: $0, now: now)
+        }
         
-        let endPoints = peers.map { $0.key }.getRandomElements(num: 8)
+        peers.forEach {
+            self.sendKeepalive(peer: $0, now: now)
+        }
+    }
+    
+    private func shouldSendKeepalive(peer: Peer, now: Date) -> Bool {
+        if let lastReceivedTime = peer.lastReceivedTime {
+            if now <= lastReceivedTime + config.refreshInterval {
+                return false
+            }
+        }
+        
+        if let lastSentTime = peer.lastSentTime {
+            if now <= lastSentTime + config.refreshInterval {
+                return false
+            }
+        }
+        
+        return true
+    }
+
+    private func sendKeepalive(peer: Peer, now: Date) {
+        let endPoints = activePeers
+            .map { $0.endPoint }
+            .getRandomElements(num: 8)
         
         let message = Message.Keepalive(endPoints: endPoints.map { $0.toV6() })
         
-        stats.keepaliveSendCount += dests.count
+        stats.keepaliveSendCount += 1
         
-        sendMessage(peers: Array(dests), message: .keepalive(message), now: now)
+        sendMessage(peers: [peer], message: .keepalive(message), now: now)
     }
     
     private func sendMessage(peers: [Peer],
@@ -264,6 +278,35 @@ public class NodeImpl {
         messageSender!.send(endPoints: peers.map { $0.endPoint }, message: message)
     }
     
+    private func handleNotifiedEndPoints(endPoints: [IPv6.EndPoint],
+                                         now: Date)
+    {
+        let peers = endPoints
+            .flatMap {
+                self.getOrAddPeerIfValidEndPoint(endPoint: $0, now: now)
+            }
+            .filter {
+                self.shouldSendKeepalive(peer: $0, now: now)
+        }
+
+        peers.forEach {
+            self.sendKeepalive(peer: $0, now: now)
+        }
+    }
+    
+    private func handleMessage(endPoint: EndPoint,
+                               header: Message.Header,
+                               message: Message)
+    {
+        let now = Date()
+        guard let peer = getOrAddPeerIfValidEndPoint(endPoint: endPoint.toV6(), now: now) else {
+            logger.warn("message received from invalid end point: \(endPoint), \(message)")
+            return
+        }
+        updatePeerReceived(peer: peer, now: now)
+        handleMessage(peer: peer, header: header, message: message, now: now)
+    }
+    
     private func handleMessage(peer: Peer,
                                header: Message.Header,
                                message: Message,
@@ -272,9 +315,7 @@ public class NodeImpl {
         switch message {
         case .keepalive(let m):
             stats.keepaliveReceiveCount += 1
-            m.endPoints.forEach { endPoint in
-                let _ = getOrAddPeerIfValidEndPoint(endPoint: endPoint, now: now)
-            }
+            self.handleNotifiedEndPoints(endPoints: m.endPoints, now: now)
         case .publish(let m):
             logger.debug("TODO: unimplemented handler: \(m)")
         case .confirmRequest(let m):
@@ -298,7 +339,13 @@ public class NodeImpl {
     private var recoveryTimer: DispatchSourceTimer?
     
     private var initialPeerResolver: InitialPeerResolver?
-    private var peers: [EndPoint: Peer]
+    private var peerMap: [EndPoint: Peer]
+    private var peers: [Peer] {
+        return Array(peerMap.values)
+    }
+    private var activePeers: [Peer] {
+        return peers.filter { $0.lastReceivedTime != nil }
+    }
     
     private var stats: NodeStats
     
