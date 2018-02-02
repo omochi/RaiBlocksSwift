@@ -26,3 +26,14 @@ extension ProtocolFamily {
         }
     }
 }
+
+extension ProtocolFamily : Equatable {}
+
+public func ==(a: ProtocolFamily, b: ProtocolFamily) -> Bool {
+    switch (a, b) {
+    case (.ipv6, .ipv6): return true
+    case (.ipv4, .ipv4): return true
+    case (.ipv6, _): return false
+    case (.ipv4, _): return false
+    }
+}

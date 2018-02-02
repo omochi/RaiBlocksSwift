@@ -34,7 +34,7 @@ extension IPv4.Address : CustomStringConvertible {
             inet_ntop(PF_INET, &addr, p, UInt32(data.count))
         }
         assert(ret != nil)
-        return String.init(data: data, encoding: .utf8)!
+        return String.init(cString: ret!)
     }
 }
 
@@ -50,7 +50,7 @@ extension IPv4.Address {
     
     public func mapToV6() -> IPv6.Address {
         var addr = in6_addr.init()
-        addr.__u6_addr.__u6_addr32 = (0, 0, NSSwapHostIntToBig(0x0000FFFF), self.addr.s_addr)
+        addr.__u6_addr.__u6_addr32 = (0, 0, UInt32(0x0000FFFF).convert(to: .big), self.addr.s_addr)
         return IPv6.Address(addr: addr)
     }
     
@@ -65,6 +65,12 @@ public func ==(a: IPv4.Address, b: IPv4.Address) -> Bool {
     return a.addr.s_addr == b.addr.s_addr
 }
 
+extension IPv4.Address : Comparable {}
+
+public func <(a: IPv4.Address, b: IPv4.Address) -> Bool {
+    return a.addr.s_addr.convert(from: .big) < b.addr.s_addr.convert(from: .big)
+}
+
 extension IPv4.EndPoint : CustomStringConvertible {
     public var description: String {
         return "\(address):\(port)"
@@ -77,6 +83,11 @@ extension IPv4.Address : Hashable {
         x = x &* 31 &+ addr.s_addr.hashValue
         return x
     }
+}
+
+extension IPv4.Address {
+    public static let loopbackRange = IPv4.Address(string: "127.0.0.0")!...IPv4.Address(string: "127.255.255.255")!
+    public static let multicastRange = IPv4.Address(string: "224.0.0.0")!...IPv4.Address(string: "239.255.255.255")!
 }
 
 extension IPv4.EndPoint : Equatable {}
@@ -97,13 +108,13 @@ extension IPv4.EndPoint : Hashable {
 extension IPv4.EndPoint {
     public init(sockAddr: sockaddr_in) {
         self.init(address: IPv4.Address(addr: sockAddr.sin_addr),
-                  port: Int(NSSwapBigShortToHost(sockAddr.sin_port)))
+                  port: Int(sockAddr.sin_port.convert(from: .big)))
     }
     
     public func asSockAddr() -> sockaddr_in {
         return sockaddr_in.init(sin_len: UInt8(MemoryLayout<sockaddr_in>.size),
                                 sin_family: UInt8(AF_INET),
-                                sin_port: NSSwapHostShortToBig(UInt16(port)),
+                                sin_port: UInt16(port).convert(to: .big),
                                 sin_addr: address.addr,
                                 sin_zero: (0, 0, 0, 0, 0, 0, 0, 0))
     }

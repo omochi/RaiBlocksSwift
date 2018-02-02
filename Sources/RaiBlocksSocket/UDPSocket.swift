@@ -21,6 +21,10 @@ public class UDPSocket {
         return impl.state
     }
     
+    public var protocolFamily: ProtocolFamily? {
+        return impl.protocolFamily
+    }
+    
     public func getLocalEndPoint() throws -> EndPoint {
         return try impl.getLocalEndPoint()
     }
@@ -61,6 +65,10 @@ public class UDPSocket {
         
         public var state: State {
             return queue.sync { _state }
+        }
+        
+        public var protocolFamily: ProtocolFamily? {
+            return queue.sync { socket?.protocolFamily }
         }
         
         public func close() {

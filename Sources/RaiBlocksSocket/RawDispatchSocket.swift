@@ -78,6 +78,8 @@ public class RawDispatchSocket {
     }
     
     public func connect(endPoint: EndPoint) throws {
+        precondition(endPoint.protocolFamily == protocolFamily)
+        
         let st = endPoint.withSockAddrPointer { (p, size) in
             Darwin.connect(fd, p, UInt32(size))
         }
@@ -109,6 +111,8 @@ public class RawDispatchSocket {
     }
     
     public func bind(endPoint: EndPoint) throws {
+        precondition(endPoint.protocolFamily == protocolFamily)
+        
         let st = endPoint.withSockAddrPointer { (p, size) in
             Darwin.bind(fd, p, UInt32(size))
         }
@@ -142,9 +146,11 @@ public class RawDispatchSocket {
     }
     
     public func sendTo(data: Data, endPoint: EndPoint) throws -> Int {
-        let st = data.withUnsafeBytes { (p: UnsafePointer<UInt8>) in
-            endPoint.withSockAddrPointer { (addr, size) in
-                Darwin.sendto(fd, p, data.count, 0, addr, UInt32(size))
+        precondition(endPoint.protocolFamily == protocolFamily)
+        
+        let st = data.withUnsafeBytes { (p: UnsafePointer<UInt8>) -> Int in
+            return endPoint.withSockAddrPointer { (addr, size) -> Int in
+                return Darwin.sendto(fd, p, data.count, 0, addr, UInt32(size))
             }
         }
         if st == -1 {

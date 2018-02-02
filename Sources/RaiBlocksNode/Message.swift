@@ -55,19 +55,23 @@ public enum Message {
         }
         
         public var description: String {
-            var extFields = [String]()
+            var extFields: [String] = []
             if ipv4Only {
                 extFields.append("ipv4Only")
             }
             if let blockKind = self.blockKind {
                 extFields.append("blockKind=\(blockKind)")
             }
+            var extStr = String(format: "%04x", extensions)
+            if extFields.count > 0 {
+                extStr += ": " + extFields.joined(separator: ", ")
+            }
             
             let fields = [
                 "magicNumber=\(String(format: "%04x", magicNumber))",
                 "version=(max=\(versionMax), using=\(versionUsing), min=\(versionMin))",
                 "kind=\(kind)",
-                "extensions=(\(String(format: "%04x", extensions)): \(extFields.joined(separator: ", ")))",
+                "extensions=(\(extStr))",
                 ]
             return "Header(\(fields.joined(separator: ", ")))"
         }
@@ -262,6 +266,17 @@ public enum Message {
     case confirmRequest(ConfirmRequest)
     // TODO
     case accountRequest(AccountRequest)
+}
+
+extension Message {
+    public var kind: Kind {
+        switch self {
+        case .keepalive: return .keepalive
+        case .publish: return .publish
+        case .confirmRequest: return .confirmRequest
+        case .accountRequest: return .accountRequest
+        }
+    }
 }
 
 extension Message : CustomStringConvertible {

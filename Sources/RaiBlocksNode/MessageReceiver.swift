@@ -3,7 +3,7 @@ import RaiBlocksSocket
 import RaiBlocksBasic
 
 public class MessageReceiver {
-    public typealias Handler = (EndPoint, Message.Header, Message, @escaping () -> Void) -> Void
+    public typealias Handler = (EndPoint, Message.Header, Message) -> Void
     
     public init(queue: DispatchQueue,
                 logger: Logger,
@@ -45,9 +45,10 @@ public class MessageReceiver {
                             let (header, message) = try self.messageReader.read(data: data)
                             self.logger.debug("message: endPoint=\(endPoint), header=\(header), message=\(message)")
                             
-                            self.handler(endPoint, header, message, next)
+                            self.handler(endPoint, header, message)
+                            next()
                         } catch let error {
-                            self.logger.debug("message read error: \(error)")
+                            self.logger.debug("message read error: \(error), endPoint=\(endPoint)")
 //                            self.logger.debug("data=\(data.toHex())")
                             next()
                         }

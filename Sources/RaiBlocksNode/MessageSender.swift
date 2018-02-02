@@ -11,23 +11,25 @@ public class MessageSender {
     public init(queue: DispatchQueue,
                 logger: Logger,
                 socket: UDPSocket,
+                bufferSize: Int,
                 errorHandler: @escaping (Error) -> Void)
     {
         self.queue = queue
-        self.logger = logger
+        self.logger = Logger(config: logger.config, tag: "MessageSender")
         self.messageWriter = MessageWriter()
         self.socket = socket
+        self.bufferSize = bufferSize
         self.errorHandler = errorHandler
         
         self.terminated = false
-        self.entries = []
+        self.buffer = []
         self.endPointIndex = 0
         self.sending = false
     }
     
     public func terminate() {
         self.terminated = true
-        self.entries.removeAll()
+        self.buffer.removeAll()
         self.endPointIndex = 0
         self.sending = false
     }
@@ -35,7 +37,12 @@ public class MessageSender {
     public func send(endPoints: [EndPoint],
                      message: Message)
     {
-        self.entries.append(Entry(endPoints: endPoints, message: message))
+        if buffer.count == bufferSize {
+            logger.warn("buffer is full. discard message: \(message)")
+            return
+        }
+                
+        buffer.append(Entry(endPoints: endPoints, message: message))
         update()
     }
     
@@ -43,12 +50,12 @@ public class MessageSender {
         if sending {
             return
         }
-        if entries.count == 0 {
+        if buffer.count == 0 {
             return
         }
  
-        let entry = self.entries.first!
-        let endPoint = entry.endPoints[endPointIndex]
+        let entry = self.buffer.first!
+        let endPoint: EndPoint = entry.endPoints[endPointIndex]
         let message = entry.message
  
         logger.trace("socket.send: \(endPoint), \(message)")
@@ -56,7 +63,8 @@ public class MessageSender {
         let data = messageWriter.write(message: message)
         
         sending = true
-        socket.send(data: data, endPoint: endPoint,
+        socket.send(data: data,
+                    endPoint: endPoint,
                     successHandler: { size in
                         if self.terminated { return }
                         
@@ -65,7 +73,7 @@ public class MessageSender {
                         
                         self.endPointIndex += 1
                         if self.endPointIndex == entry.endPoints.count {
-                            self.entries.removeFirst()
+                            self.buffer.removeFirst()
                             self.endPointIndex = 0
                         }
                         
@@ -86,10 +94,11 @@ public class MessageSender {
     private let logger: Logger
     private let messageWriter: MessageWriter
     private let socket: UDPSocket
+    private let bufferSize: Int
     private let errorHandler: ((Error) -> Void)
     
     private var terminated: Bool
-    private var entries: [Entry]
+    private var buffer: [Entry]
     private var endPointIndex: Int
     
     private var sending: Bool 

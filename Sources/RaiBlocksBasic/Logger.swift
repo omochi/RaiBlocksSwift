@@ -1,12 +1,13 @@
 import Foundation
 
 public class Logger {
-    public enum Level : Int, CustomStringConvertible {
+    public enum Level : Int, CustomStringConvertible, Comparable {
         case trace = 0
         case debug
         case info
         case warn
         case error
+        case silent
         
         public var description: String {
             switch self {
@@ -15,19 +16,30 @@ public class Logger {
             case .info: return "INFO"
             case .warn: return "WARN"
             case .error: return "ERROR"
+            case .silent: return "SILENT"
             }
         }
     }
-    
+
     public class Config {
         public var level: Level
         
+        public var tagLevel: [String: Level]
+        
         public init(level: Level = .info) {
             self.level = level
+            self.tagLevel = [:]
+        }
+        
+        public func level(for tag: String) -> Level {
+            if let level = tagLevel[tag] {
+                return level
+            }
+            return self.level
         }
     }
     
-    public init(config: Config, tag: String? = nil) {
+    public init(config: Config, tag: String) {
         self.config = config
         self.tag = tag
         
@@ -38,7 +50,7 @@ public class Logger {
     }
     
     public var config: Config
-    public var tag: String?
+    public var tag: String
 
     public func trace(_ message: String) {
         log(level: .trace, message)
@@ -61,7 +73,7 @@ public class Logger {
     }
     
     public func log(level: Level, _ message: String) {
-        guard level.rawValue >= config.level.rawValue else {
+        guard config.level(for: tag) <= level else {
             return
         }
         
@@ -70,9 +82,7 @@ public class Logger {
         var tags: [String] = []        
         tags.append(timeTag)
         tags.append(level.description)
-        if let tag = self.tag {
-            tags.append(tag)
-        }
+        tags.append(tag)
         log(tags: tags, message)
     }
     
@@ -89,5 +99,14 @@ public class Logger {
     }
     
     private let dateFormatter: DateFormatter
+}
+
+
+public func ==(a: Logger.Level, b: Logger.Level) -> Bool {
+    return a.rawValue == b.rawValue
+}
+
+public func <(a: Logger.Level, b: Logger.Level) -> Bool {
+    return a.rawValue < b.rawValue
 }
 

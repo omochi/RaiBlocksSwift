@@ -10,6 +10,7 @@ public class Node {
         public var refreshInterval: TimeInterval
         public var offlineInterval: TimeInterval
         public var initialPeerHostnames: [String]
+        public var sendingBufferSize: Int
         
         public init() {
             self.recoveryInterval = 10
@@ -17,6 +18,7 @@ public class Node {
             self.refreshInterval = 60
             self.offlineInterval = 60 * 5
             self.initialPeerHostnames = ["rai.raiblocks.net"]
+            self.sendingBufferSize = 100
         }
     }
     

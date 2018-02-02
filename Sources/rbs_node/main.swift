@@ -4,7 +4,7 @@ import RaiBlocksNode
 
 func main() {
     let mainQueue: DispatchQueue = .main
-    let logger: Logger = Logger.init(config: Logger.Config(level: .trace))
+    let logger: Logger = Logger(config: Logger.Config(level: .info), tag: "main")
     var node: Node!
     
     func boot() {
@@ -13,6 +13,7 @@ func main() {
             var config = Node.Config()
             config.refreshInterval = 10
             config.offlineInterval = 30
+            config.sendingBufferSize = 1
             let queue = DispatchQueue.init(label: "node-queue")
             node = Node(environment: environment,
                         logger: logger,

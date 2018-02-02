@@ -24,6 +24,10 @@ public class TCPSocket {
         return impl.state
     }
     
+    public var protocolFamily: ProtocolFamily? {
+        return impl.protocolFamily
+    }
+    
     public func close() {
         impl.close()
     }
@@ -92,6 +96,10 @@ public class TCPSocket {
             return queue.sync { _state }
         }
         
+        public var protocolFamily: ProtocolFamily? {
+            return queue.sync { socket?.protocolFamily }
+        }
+        
         public var endPoint: EndPoint? {
             return queue.sync { _endPoint }
         }
@@ -138,7 +146,7 @@ public class TCPSocket {
                     let task = task!
                     
                     do {
-                        guard var endPoint = endPoints.getRandom() else {
+                        guard var endPoint = endPoints.getRandomElement() else {
                             throw SocketError.init(message: "name resolve failed, no entry: hostname=\(hostname)")
                         }
                         endPoint.port = port

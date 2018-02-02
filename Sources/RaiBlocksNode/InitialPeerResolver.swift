@@ -7,7 +7,7 @@ public class InitialPeerResolver {
                 queue: DispatchQueue,
                 hostnames: [String],
                 recoveryInterval: TimeInterval,
-                endPointsHandler: @escaping ([EndPoint]) -> Void,
+                endPointsHandler: @escaping ([IPv6.EndPoint]) -> Void,
                 completeHandler: @escaping () -> Void)
     {
         self.logger = Logger(config: logger.config, tag: "InitialPeerResolver")
@@ -51,15 +51,13 @@ public class InitialPeerResolver {
                            hostname: hostname,
                            callbackQueue: queue,
                            successHandler: { (endPoints) in
-                            var endPoints = endPoints
+
                             
                             self.logger.trace("nameResolve.success: \(endPoints)")
                             self.task?.terminate()
                             self.task = nil
                             
-                            endPoints = endPoints.map { endPoint in
-                                EndPoint.ipv6(endPoint.toV6())
-                            }
+                            var endPoints = endPoints.map { $0.toV6() }
                             endPoints = Set(endPoints).map { $0 }
                             
                             self.endPointsHandler(endPoints)
@@ -81,7 +79,7 @@ public class InitialPeerResolver {
     private let queue: DispatchQueue
     private let hostnames: [String]
     private let recoveryInterval: TimeInterval
-    private let endPointsHandler: ([EndPoint]) -> Void
+    private let endPointsHandler: ([IPv6.EndPoint]) -> Void
     private let completeHandler: () -> Void
     
     private var terminated: Bool

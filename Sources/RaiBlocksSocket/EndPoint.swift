@@ -124,6 +124,17 @@ extension EndPoint {
         return ret
     }
     
+    public func toV4() throws -> IPv4.EndPoint {
+        switch self {
+        case .ipv6(let ep):
+            guard let v4 = ep.mappedV4 else {
+                throw SocketError(message: "it can not be converted to IPv4: \(ep)")
+            }
+            return v4
+        case .ipv4(let ep): return ep
+        }
+    }
+    
     public func toV6() -> IPv6.EndPoint {
         switch self {
         case .ipv6(let ep): return ep

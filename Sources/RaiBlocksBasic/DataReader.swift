@@ -1,4 +1,5 @@
 import Foundation
+import RaiBlocksSocket
 
 public class DataReader {
     public init(data: Data) {

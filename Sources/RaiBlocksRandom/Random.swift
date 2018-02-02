@@ -6,6 +6,10 @@ public enum Random {
         return getValue(of: UInt.self)
     }
     
+    public static func getIndex(size: Int) -> Int {
+        return Int(getUInt() % UInt(size))
+    }
+    
     public static func getUInt32() -> UInt32 {
         return getValue(of: UInt32.self)
     }
@@ -26,7 +30,7 @@ public enum Random {
 }
 
 extension Collection where Index == Int, IndexDistance == Int {
-    public func getRandom() -> Element? {
+    public func getRandomElement() -> Element? {
         return getRandomIndex().map { self[$0] }
     }
     
@@ -35,7 +39,19 @@ extension Collection where Index == Int, IndexDistance == Int {
         guard count > 0 else {
             return nil
         }
-        let dice = Int(Random.getUInt() % UInt(count))
+        let dice = Random.getIndex(size: count)
         return self.index(startIndex, offsetBy: dice)
+    }
+    
+    public func getRandomElements(num: Int) -> [Element] {
+        let num = Swift.min(num, self.count)
+        var work = Array(self)
+        for i in 0..<num {
+            let pickIndex = i + Random.getIndex(size: work.count - i)
+            let escaped = work[i]
+            work[i] = work[pickIndex]
+            work[pickIndex] = escaped
+        }
+        return Array(work.prefix(num))
     }
 }
