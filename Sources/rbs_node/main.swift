@@ -3,8 +3,9 @@ import RaiBlocksBasic
 import RaiBlocksNode
 
 func main() {
+    let loggerConfig = Logger.Config(level: .debug)
     let mainQueue: DispatchQueue = .main
-    let logger: Logger = Logger(config: Logger.Config(level: .info), tag: "main")
+    let logger: Logger = Logger(config: loggerConfig, tag: "main")
     var node: Node!
     
     func boot() {

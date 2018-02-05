@@ -43,7 +43,7 @@ public class MessageReceiver {
                         
                         do {
                             let (header, message) = try self.messageReader.read(data: data)
-                            self.logger.debug("message: endPoint=\(endPoint), header=\(header), message=\(message)")
+//                            self.logger.debug("message: endPoint=\(endPoint), header=\(header), message=\(message)")
                             
                             self.handler(endPoint, header, message)
                             next()
