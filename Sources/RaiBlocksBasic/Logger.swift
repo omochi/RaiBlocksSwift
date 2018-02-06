@@ -49,8 +49,8 @@ public class Logger {
         dateFormatter.dateFormat = "yyyy/MM/dd HH:mm:ss.SSS"
     }
     
-    public var config: Config
-    public var tag: String
+    public let config: Config
+    public let tag: String
 
     public func trace(_ message: String) {
         log(level: .trace, message)

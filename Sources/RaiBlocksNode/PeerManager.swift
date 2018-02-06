@@ -4,18 +4,21 @@ import RaiBlocksBasic
 
 public class PeerManager {
     public init(queue: DispatchQueue,
-                logger: Logger,
                 config: Node.Config,
                 socket: UDPSocket)
     {
         var sself: PeerManager!
         
         self.queue = queue
-        self.logger = Logger(config: logger.config, tag: "PeerManager")
         self.config = config
+        self.logger = Logger(config: config.loggerConfig, tag: "PeerManager")
+
         self.socket = socket
 
-        self.receiver = MessageReceiver(queue: queue, logger: logger, socket: socket,
+        self.receiver = MessageReceiver(queue: queue,
+                                        loggerConfig: config.loggerConfig,
+                                        network: config.network,
+                                        socket: socket,
                                         handler: { (endPoint, header, message) in
                                             sself.handleMessage(endPoint: endPoint,
                                                                 header: header,
@@ -25,7 +28,10 @@ public class PeerManager {
                                             sself.errorHandler?(error)
         })
         
-        self.sender = MessageSender(queue: queue, logger: logger, socket: socket,
+        self.sender = MessageSender(queue: queue,
+                                    loggerConfig: config.loggerConfig,
+                                    network: config.network,
+                                    socket: socket,
                                     bufferSize: config.sendingBufferSize,
                                     errorHandler: { error in
                                         sself.errorHandler?(error)
@@ -98,17 +104,12 @@ public class PeerManager {
     private func startInitialPeerNameResolve() {
         initialPeerResolver?.terminate()
         
-        initialPeerResolver = InitialPeerResolver(logger: logger,
-                                                  queue: queue,
-                                                  hostnames: config.initialPeerHostnames,
+        initialPeerResolver = InitialPeerResolver(queue: queue,
+                                                  loggerConfig: config.loggerConfig,
+                                                  hostnames: config.network.initialPeerHostnames,
+                                                  peerPort: config.network.peerPort,
                                                   recoveryInterval: 10,
                                                   endPointsHandler: { endPoints in
-                                                    let endPoints: [IPv6.EndPoint] = endPoints.map { endPoint in
-                                                        var endPoint: IPv6.EndPoint = endPoint
-                                                        endPoint.port = self.config.peerPort
-                                                        return endPoint
-                                                    }
-                                                    
                                                     let now = Date()
                                                     self.handleNotifiedEndPoints(endPoints: endPoints, now: now)
         },
@@ -242,8 +243,8 @@ public class PeerManager {
     }
     
     private let queue: DispatchQueue
-    private let logger: Logger
     private let config: Node.Config
+    private let logger: Logger
     private let socket: UDPSocket
     private let receiver: MessageReceiver
     private let sender: MessageSender

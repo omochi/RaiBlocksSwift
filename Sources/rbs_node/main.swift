@@ -10,16 +10,17 @@ func main() {
     
     func boot() {
         do {
-            let environment = try Environment.createDefault()
-            var config = Node.Config()
-            config.refreshInterval = 60
-            config.offlineInterval = config.refreshInterval * 5
-            config.sendingBufferSize = 1000 * 1000
+            let fileSystem = try FileSystem.createDefault()
+            let network = Network.main
+            let storage = try Storage(fileSystem: fileSystem,
+                                      network: network)
+            let config = Node.Config(loggerConfig: loggerConfig,
+                                     fileSystem: fileSystem,
+                                     network: network,
+                                     storage: storage)
             let queue = DispatchQueue.init(label: "node-queue")
-            node = Node(environment: environment,
-                        logger: logger,
-                        config: config,
-                        queue: queue)
+            node = Node(queue: queue,
+                        config: config)
             
             try node!.start()
             

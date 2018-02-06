@@ -3,16 +3,18 @@ import RaiBlocksSocket
 import RaiBlocksBasic
 
 public class InitialPeerResolver {
-    public init(logger: Logger,
-                queue: DispatchQueue,
+    public init(queue: DispatchQueue,
+                loggerConfig: Logger.Config,
                 hostnames: [String],
+                peerPort: Int,
                 recoveryInterval: TimeInterval,
                 endPointsHandler: @escaping ([IPv6.EndPoint]) -> Void,
                 completeHandler: @escaping () -> Void)
     {
-        self.logger = Logger(config: logger.config, tag: "InitialPeerResolver")
         self.queue = queue
+        self.logger = Logger(config: loggerConfig, tag: "InitialPeerResolver")
         self.hostnames = hostnames
+        self.peerPort = peerPort
         self.recoveryInterval = recoveryInterval
         self.endPointsHandler = endPointsHandler
         self.completeHandler = completeHandler
@@ -51,15 +53,18 @@ public class InitialPeerResolver {
                            hostname: hostname,
                            callbackQueue: queue,
                            successHandler: { (endPoints) in
-
-                            
                             self.logger.trace("nameResolve.success: \(endPoints)")
                             self.task?.terminate()
                             self.task = nil
                             
-                            var endPoints = endPoints.map { $0.toV6() }
+                            var endPoints: [IPv6.EndPoint] = endPoints.map { $0.toV6() }
                             endPoints = Set(endPoints).map { $0 }
-                            
+                            endPoints = endPoints.map {
+                                var endPoint = $0
+                                endPoint.port = self.peerPort
+                                return endPoint
+                            }
+
                             self.endPointsHandler(endPoints)
                             self.hostnameIndex += 1
                             self.update()
@@ -75,9 +80,10 @@ public class InitialPeerResolver {
         })
     }
     
-    private let logger: Logger
     private let queue: DispatchQueue
+    private let logger: Logger
     private let hostnames: [String]
+    private let peerPort: Int
     private let recoveryInterval: TimeInterval
     private let endPointsHandler: ([IPv6.EndPoint]) -> Void
     private let completeHandler: () -> Void

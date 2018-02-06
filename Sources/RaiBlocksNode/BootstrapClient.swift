@@ -3,9 +3,11 @@ import RaiBlocksBasic
 import RaiBlocksSocket
 
 public class BootstrapClient {
-    public init(messageWriter: MessageWriter,
+    public init(network: Network,
+                messageWriter: MessageWriter,
                 callbackQueue: DispatchQueue) {
-        queue = DispatchQueue.init(label: "BootstrapClient.queue")
+        self.queue = DispatchQueue.init(label: "BootstrapClient.queue")
+        self.network = network
         self.messageWriter = messageWriter
         self.callbackQueue = callbackQueue
         _terminated = false
@@ -55,7 +57,7 @@ public class BootstrapClient {
             request.age = UInt32.max
             request.count = UInt32.max
             
-            _socket!.send(data: messageWriter.write(message: request),
+            _socket!.send(data: messageWriter.write(message: .accountRequest(request), network: network),
                           successHandler: {
                             wself?.receiveAccount(entryHandler: entryHandler,
                                                   errorHandler: errorHandler)
@@ -137,6 +139,7 @@ public class BootstrapClient {
     }
     
     private let queue: DispatchQueue
+    private let network: Network
     private let messageWriter: MessageWriter
     private let callbackQueue: DispatchQueue
     private var _terminated: Bool

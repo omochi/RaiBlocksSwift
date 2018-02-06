@@ -6,13 +6,15 @@ public class MessageReceiver {
     public typealias Handler = (EndPoint, Message.Header, Message) -> Void
     
     public init(queue: DispatchQueue,
-                logger: Logger,
+                loggerConfig: Logger.Config,
+                network: Network,
                 socket: UDPSocket,
                 handler: @escaping Handler,
                 errorHandler: @escaping (Error) -> Void)
     {
         self.queue = queue
-        self.logger = Logger(config: logger.config, tag: "MessageReceiver")
+        self.logger = Logger(config: loggerConfig, tag: "MessageReceiver")
+        self.network = network
         self.messageReader = MessageReader()
         self.socket = socket
         self.handler = handler
@@ -42,7 +44,8 @@ public class MessageReceiver {
                         if self.terminated { return }
                         
                         do {
-                            let (header, message) = try self.messageReader.read(data: data)
+                            let (header, message) = try self.messageReader.read(data: data, network: self.network)
+                            
 //                            self.logger.debug("message: endPoint=\(endPoint), header=\(header), message=\(message)")
                             
                             self.handler(endPoint, header, message)
@@ -63,6 +66,7 @@ public class MessageReceiver {
     
     private let queue: DispatchQueue
     private let logger: Logger
+    private let network: Network
     private let messageReader: MessageReader
     private let socket: UDPSocket
     private let handler: Handler

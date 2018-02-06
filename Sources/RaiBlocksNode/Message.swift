@@ -35,9 +35,10 @@ public enum Message {
         public var kind: Kind
         public var extensions: UInt16
         
-        public init(kind: Kind) {
-            self.magicNumber = UInt16(Unicode.Scalar("R")!.value) << 8 |
-                UInt16(Unicode.Scalar("C")!.value)
+        public init(kind: Kind,
+                    network: Network)
+        {
+            self.magicNumber = network.magicNumber
             self.versionMax = 5
             self.versionUsing = 5
             self.versionMin = 5
@@ -277,6 +278,15 @@ extension Message {
         case .accountRequest: return .accountRequest
         }
     }
+    
+    public var blockKind: Block.Kind? {
+        switch self {
+        case .keepalive(let m): return m.blockKind
+        case .publish(let m): return m.blockKind
+        case .confirmRequest(let m): return m.blockKind
+        case .accountRequest(let m): return m.blockKind
+        }
+    }
 }
 
 extension Message : CustomStringConvertible {
@@ -286,6 +296,17 @@ extension Message : CustomStringConvertible {
         case .publish(let m): return m.description
         case .confirmRequest(let m): return m.description
         case .accountRequest(let m): return m.description
+        }
+    }
+}
+
+extension Message : DataWritable {
+    public func write(to writer: DataWriter) {
+        switch self {
+        case .keepalive(let m): m.write(to: writer)
+        case .publish(let m): m.write(to: writer)
+        case .confirmRequest(let m): m.write(to: writer)
+        case .accountRequest(let m): m.write(to: writer)
         }
     }
 }

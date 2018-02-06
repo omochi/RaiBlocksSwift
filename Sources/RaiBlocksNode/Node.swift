@@ -4,34 +4,42 @@ import RaiBlocksBasic
 import Foundation
 
 public class Node {
-    public struct Config {
-        public var recoveryInterval: TimeInterval
-        public var peerPort: Int
-        public var refreshInterval: TimeInterval
-        public var offlineInterval: TimeInterval
-        public var initialPeerHostnames: [String]
-        public var sendingBufferSize: Int
+    public class Config {
+        public let loggerConfig: Logger.Config
+        public let fileSystem: FileSystem
+        public let network: Network
+        public let storage: Storage
+        public let recoveryInterval: TimeInterval
+        public let refreshInterval: TimeInterval
+        public let offlineInterval: TimeInterval
+        public let sendingBufferSize: Int
         
-        public init() {
-            self.recoveryInterval = 10
-            self.peerPort = 7075
-            self.refreshInterval = 60
-            self.offlineInterval = 60 * 5
-            self.initialPeerHostnames = ["rai.raiblocks.net"]
-            self.sendingBufferSize = 1000
-
-            
+        public init(loggerConfig: Logger.Config,
+                    fileSystem: FileSystem,
+                    network: Network,
+                    storage: Storage,
+                    recoveryInterval: TimeInterval = 10,
+                    refreshInterval: TimeInterval = 60,
+                    offlineInterval: TimeInterval = 60 * 5,
+                    sendingBufferSize: Int = 100 * 1000
+                    )
+        {
+            self.loggerConfig = loggerConfig
+            self.fileSystem = fileSystem
+            self.network = network
+            self.storage = storage
+            self.recoveryInterval = recoveryInterval
+            self.refreshInterval = refreshInterval
+            self.offlineInterval = offlineInterval
+            self.sendingBufferSize = sendingBufferSize
         }
     }
     
-    public convenience init(environment: Environment,
-                            logger: Logger,
-                            config: Node.Config,
-                            queue: DispatchQueue) {
-        self.init(impl: NodeImpl(environment: environment,
-                                 logger: logger,
-                                 config: config,
-                                 queue: queue))
+    public convenience init(queue: DispatchQueue,
+                            config: Node.Config)
+    {
+        self.init(impl: NodeImpl(queue: queue,
+                                 config: config))
     }
     
     deinit {

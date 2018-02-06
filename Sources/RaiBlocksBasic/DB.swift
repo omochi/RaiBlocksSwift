@@ -33,13 +33,20 @@ extension SQLite.Blob {
 
 public enum DB {
     public class InfoTable {
+        public struct Row {
+            public var version: Int
+            public var network: String
+        }
+        
         public init() {
             self.table = .init("info")
             self.version = .init("version")
+            self.network = .init("network")
         }
         
         public let table: SQLite.Table
         public let version: SQLite.Expression<Int>
+        public let network: SQLite.Expression<String>
         
         public func createIfNotExists(connection: SQLite.Connection) throws {
             try connection.run(table.create(ifNotExists: true) { t in
@@ -47,10 +54,13 @@ public enum DB {
             })
         }
         
-        public func getVersion(connection: SQLite.Connection) throws -> Int? {
+        public func getRow(connection: SQLite.Connection) throws -> Row? {
             try DB.info.createIfNotExists(connection: connection)
-            let row = try connection.pluck(DB.info.table.select(DB.info.version))
-            return row?[DB.info.version]
+            guard let row = try connection.pluck(DB.info.table.select(*)) else {
+                return nil
+            }
+            return Row(version: row[self.version],
+                       network: row[self.network])
         }
     }
     
@@ -336,10 +346,15 @@ public enum DB {
     public static let blocks: BlocksTable = .init()
     public static let accounts: AccountsTable = .init()
     
-    public static func migrateLedgerDB(connection: SQLite.Connection) throws {
-        let version = try info.getVersion(connection: connection)
-        if version == nil {
-            try connection.run(info.table.insert(info.version <- 1))
+    public static func migrateLedgerDB(connection: SQLite.Connection,
+                                       network: Network) throws {
+        if let row = try info.getRow(connection: connection) {
+            guard row.network == network.name else {
+                throw GenericError(message: "invalid storage network: expected=\(network.name), actual=\(row.network)")
+            }
+        } else {
+            try connection.run(info.table.insert(info.version <- 1,
+                                                 info.network <- network.name))
             try blocks.create(connection: connection)
             try accounts.create(connection: connection)
         }

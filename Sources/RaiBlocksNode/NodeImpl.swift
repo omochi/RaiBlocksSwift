@@ -3,20 +3,16 @@ import RaiBlocksSocket
 import RaiBlocksBasic
 
 public class NodeImpl {
-    public init(environment: Environment,
-                logger: Logger,
-                config: Node.Config,
-                queue: DispatchQueue)
+    public init(queue: DispatchQueue,
+                config: Node.Config)
     {
-        self.environment = environment
         self.queue = queue
-        self.logger = Logger(config: logger.config, tag: "Node")
         self.config = config
+        self.logger = Logger(config: config.loggerConfig, tag: "Node")
         self.terminated = false
         
         self.stats = NodeStats()
         
-        logger.info("environment: \(environment)")
         logger.info("config: \(config)")
     }
     
@@ -107,8 +103,9 @@ public class NodeImpl {
     }
     
     private func buildPeerManager(socket: UDPSocket) -> PeerManager {
-        let pm = PeerManager(queue: queue, logger: logger,
-                             config: config, socket: socket)
+        let pm = PeerManager(queue: queue,
+                             config: config,
+                             socket: socket)
         pm.messageHandler = {
             self.handleMessage(peer: $0, header: $1, message: $2, now: $3) }
         pm.errorHandler = { _ in
@@ -150,10 +147,9 @@ public class NodeImpl {
     }
     
     private let queue: DispatchQueue
-    private let environment: Environment
-    private let logger: Logger
     private let config: Node.Config
-    
+    private let logger: Logger
+
     private var terminated: Bool
     
     private var socket: UDPSocket?

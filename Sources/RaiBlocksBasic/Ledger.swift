@@ -93,7 +93,8 @@ public class Ledger {
             return .needPrevious
         }
         
-        
+        // TODO
+        fatalError("TODO")
     }
     
     private let queue: DispatchQueue

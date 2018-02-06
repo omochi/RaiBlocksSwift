@@ -5,9 +5,13 @@ public class MessageReader {
     public init() {
     }
     
-    public func read(data: Data) throws -> (Message.Header, Message) {
+    public func read(data: Data, network: Network) throws -> (Message.Header, Message) {
         let reader = DataReader(data: data)
         let header = try Message.Header(from: reader)
+        guard header.magicNumber == network.magicNumber else {
+            throw GenericError(message: "invalid magic number: \(header)")
+        }
+        
         let message: Message
         switch header.kind {
         case .invalid, .notAKind:

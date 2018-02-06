@@ -9,13 +9,15 @@ public class MessageSender {
     }
     
     public init(queue: DispatchQueue,
-                logger: Logger,
+                loggerConfig: Logger.Config,
+                network: Network,
                 socket: UDPSocket,
                 bufferSize: Int,
                 errorHandler: @escaping (Error) -> Void)
     {
         self.queue = queue
-        self.logger = Logger(config: logger.config, tag: "MessageSender")
+        self.logger = Logger(config: loggerConfig, tag: "MessageSender")
+        self.network = network
         self.messageWriter = MessageWriter()
         self.socket = socket
         self.bufferSize = bufferSize
@@ -60,7 +62,7 @@ public class MessageSender {
  
         logger.trace("socket.send: \(endPoint), \(message)")
         
-        let data = messageWriter.write(message: message)
+        let data = messageWriter.write(message: message, network: network)
         
         sending = true
         socket.send(data: data,
@@ -92,6 +94,7 @@ public class MessageSender {
     
     private let queue: DispatchQueue
     private let logger: Logger
+    private let network: Network
     private let messageWriter: MessageWriter
     private let socket: UDPSocket
     private let bufferSize: Int
