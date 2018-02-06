@@ -18,7 +18,9 @@ public class Node {
             self.refreshInterval = 60
             self.offlineInterval = 60 * 5
             self.initialPeerHostnames = ["rai.raiblocks.net"]
-            self.sendingBufferSize = 100
+            self.sendingBufferSize = 1000
+
+            
         }
     }
     

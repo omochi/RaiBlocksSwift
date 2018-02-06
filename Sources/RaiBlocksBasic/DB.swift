@@ -55,6 +55,129 @@ public enum DB {
     }
     
     public class BlocksTable {
+        public struct Row {
+            public var hash: Block.Hash
+            public var kind: Block.Kind
+            public var previous: Block.Hash?
+            public var source: Block.Hash?
+            public var destination: Account.Address?
+            public var balance: Amount?
+            public var representative: Account.Address?
+            public var account: Account.Address?
+            public var signature: Signature?
+            public var work: Work?
+            public var pending: Bool
+            
+            public init(hash: Block.Hash,
+                        kind: Block.Kind,
+                        previous: Block.Hash?,
+                        source: Block.Hash?,
+                        destination: Account.Address?,
+                        balance: Amount?,
+                        representative: Account.Address?,
+                        account: Account.Address?,
+                        signature: Signature?,
+                        work: Work?,
+                        pending: Bool)
+            {
+                self.hash = hash
+                self.kind = kind
+                self.previous = previous
+                self.source = source
+                self.destination = destination
+                self.balance = balance
+                self.representative = representative
+                self.account = account
+                self.signature = signature
+                self.work = work
+                self.pending = pending
+            }
+            
+            public init(from block: Block,
+                        pending: Bool)
+            {
+                switch block {
+                case .send(let b):
+                    self.init(hash: b.hash,
+                              kind: type(of: b).kind,
+                              previous: b.previous,
+                              source: nil,
+                              destination: b.destination,
+                              balance: b.balance,
+                              representative: nil,
+                              account: nil,
+                              signature: b.signature,
+                              work: b.work,
+                              pending: pending)
+                case .receive(let b):
+                    self.init(hash: b.hash,
+                              kind: type(of: b).kind,
+                              previous: b.previous,
+                              source: b.source,
+                              destination: nil,
+                              balance: nil,
+                              representative: nil,
+                              account: nil,
+                              signature: b.signature,
+                              work: b.work,
+                              pending: pending)
+                case .open(let b):
+                    self.init(hash: b.hash,
+                              kind: type(of: b).kind,
+                              previous: nil,
+                              source: b.source,
+                              destination: nil,
+                              balance: nil,
+                              representative: b.representative,
+                              account: b.account,
+                              signature: b.signature,
+                              work: b.work,
+                              pending: pending)
+                case .change(let b):
+                    self.init(hash: b.hash,
+                              kind: type(of: b).kind,
+                              previous: b.previous,
+                              source: nil,
+                              destination: nil,
+                              balance: nil,
+                              representative: b.representative,
+                              account: nil,
+                              signature: b.signature,
+                              work: b.work,
+                              pending: pending)
+                }
+            }
+            
+            public func toBlock() -> Block {
+                switch kind {
+                case .send:
+                    return .send(Block.Send(previous: previous!,
+                                            destination: destination!,
+                                            balance: balance!,
+                                            signature: signature,
+                                            work: work))
+                case .receive:
+                    return .receive(Block.Receive(previous: previous!,
+                                                  source: source!,
+                                                  signature: signature,
+                                                  work: work))
+                case .open:
+                    return .open(Block.Open(source: source!,
+                                            representative: representative!,
+                                            account: account!,
+                                            signature: signature,
+                                            work: work))
+                case .change:
+                    return .change(Block.Change(previous: previous!,
+                                                representative: representative!,
+                                                signature: signature,
+                                                work: work))
+                default:
+                    fatalError("invalid block kind: \(kind)")
+                }
+            }
+        }
+        
         public init() {
             self.table = .init("blocks")
             self.hash = .init("hash")
@@ -67,6 +190,7 @@ public enum DB {
             self.account = .init("account")
             self.signature = .init("signature")
             self.work = .init("work")
+            self.pending = .init("pending")
         }
         
         public let table: SQLite.Table
@@ -80,6 +204,7 @@ public enum DB {
         public let account: SQLite.Expression<SQLite.Blob?>
         public let signature: SQLite.Expression<SQLite.Blob?>
         public let work: SQLite.Expression<SQLite.Blob?>
+        public let pending: SQLite.Expression<Bool>
         
         public func create(connection: SQLite.Connection) throws {
             try connection.run(table.create() { t in
@@ -93,112 +218,66 @@ public enum DB {
                 t.column(account)
                 t.column(signature)
                 t.column(work)
+                t.column(pending)
             })
         }
         
-        public func write(block: Block.Send,
-                          connection: SQLite.Connection) throws {
-            let blockHash = block.hash
-            try connection.run(table.filter(hash == blockHash.asSQLite()).delete())
-            try connection.run(table.insert(hash <- blockHash.asSQLite(),
-                                            kind <- Int(type(of: block).kind.rawValue),
-                                            previous <- block.previous.asSQLite(),
-                                            destination <- block.destination.asSQLite(),
-                                            balance <- block.balance.asSQLite(),
-                                            signature <- block.signature?.asSQLite(),
-                                            work <- block.work?.asSQLite()
-                                            ))
+        public func put(row: Row,
+                        connection: SQLite.Connection) throws {
+            try connection.run(table.filter(hash == row.hash.asSQLite()).delete())
+            try connection.run(table.insert(hash <- row.hash.asSQLite(),
+                                            kind <- Int(row.kind.rawValue),
+                                            previous <- row.previous?.asSQLite(),
+                                            source <- row.source?.asSQLite(),
+                                            destination <- row.destination?.asSQLite(),
+                                            balance <- row.balance?.asSQLite(),
+                                            representative <- row.representative?.asSQLite(),
+                                            account <- row.account?.asSQLite(),
+                                            signature <- row.signature?.asSQLite(),
+                                            work <- row.work?.asSQLite(),
+                                            pending <- row.pending))
         }
         
-        public func write(block: Block.Receive,
-                          connection: SQLite.Connection) throws {
-            let blockHash = block.hash
-            try connection.run(table.filter(hash == blockHash.asSQLite()).delete())
-            try connection.run(table.insert(hash <- blockHash.asSQLite(),
-                                            kind <- Int(type(of: block).kind.rawValue),
-                                            previous <- block.previous.asSQLite(),
-                                            source <- block.source.asSQLite(),
-                                            signature <- block.signature?.asSQLite(),
-                                            work <- block.work?.asSQLite()
-            ))
-        }
-        
-        public func write(block: Block.Open,
-                          connection: SQLite.Connection) throws {
-            let blockHash = block.hash
-            try connection.run(table.filter(hash == blockHash.asSQLite()).delete())
-            try connection.run(table.insert(hash <- blockHash.asSQLite(),
-                                            kind <- Int(type(of: block).kind.rawValue),
-                                            source <- block.source.asSQLite(),
-                                            representative <- block.representative.asSQLite(),
-                                            account <- block.account.asSQLite(),
-                                            signature <- block.signature?.asSQLite(),
-                                            work <- block.work?.asSQLite()
-            ))
-        }
-        
-        public func write(block: Block.Change,
-                          connection: SQLite.Connection) throws {
-            let blockHash = block.hash
-            try connection.run(table.filter(hash == blockHash.asSQLite()).delete())
-            try connection.run(table.insert(hash <- blockHash.asSQLite(),
-                                            kind <- Int(type(of: block).kind.rawValue),
-                                            previous <- block.previous.asSQLite(),
-                                            representative <- block.representative.asSQLite(),
-                                            signature <- block.signature?.asSQLite(),
-                                            work <- block.work?.asSQLite()
-            ))
-        }
-        
-        public func write(block: Block,
-                          connection: SQLite.Connection) throws {
-            switch block {
-            case .send(let b):
-                try write(block: b, connection: connection)
-            case .receive(let b):
-                try write(block: b, connection: connection)
-            case .open(let b):
-                try write(block: b, connection: connection)
-            case .change(let b):
-                try write(block: b, connection: connection)
-            }
-        }
-        
-        public func read(hash: Block.Hash,
-                         connection: SQLite.Connection) throws -> Block?
+        public func put(block: Block,
+                        connection: SQLite.Connection) throws
         {
-            guard let row = try connection.pluck(table.select(*)
-                .filter(self.hash == hash.asSQLite())) else
+            let row = Row(from: block, pending: false)
+            try put(row: row, connection: connection)
+        }
+        
+        public func getRow(hash: Block.Hash,
+                           pending: Bool?,
+                           connection: SQLite.Connection) throws -> Row?
+        {
+            var query = table.select(*).filter(self.hash == hash.asSQLite())
+            if let pending = pending {
+                query = query.filter(self.pending == pending)
+            }
+            
+            guard let row = try connection.pluck(query) else
             {
                 return nil
             }
-            let kind = Block.Kind(rawValue: UInt8(try row.get(self.kind)))!
-            switch kind {
-            case .send:
-                return .send(Block.Send(previous: row[previous]!.asBlockHash(),
-                                        destination: row[destination]!.asAccountAddress(),
-                                        balance: row[balance]!.asAmount(),
-                                        signature: row[signature]?.asSignature(),
-                                        work: row[work]?.asWork()))
-            case .receive:
-                return .receive(Block.Receive(previous: row[previous]!.asBlockHash(),
-                                              source: row[source]!.asBlockHash(),
-                                              signature: row[signature]?.asSignature(),
-                                              work: row[work]?.asWork()))
-            case .open:
-                return .open(Block.Open(source: row[source]!.asBlockHash(),
-                                        representative: row[representative]!.asAccountAddress(),
-                                        account: row[account]!.asAccountAddress(),
-                                        signature: row[signature]?.asSignature(),
-                                        work: row[work]?.asWork()))
-            case .change:
-                return .change(Block.Change(previous: row[previous]!.asBlockHash(),
-                                            representative: row[representative]!.asAccountAddress(),
-                                            signature: row[signature]?.asSignature(),
-                                            work: row[work]?.asWork()))
-            default:
-                fatalError("invalid kind: \(kind)")
+            return Row(hash: row[self.hash].asBlockHash(),
+                       kind: Block.Kind(rawValue: UInt8(row[kind]))!,
+                       previous: row[previous]?.asBlockHash(),
+                       source: row[source]?.asBlockHash(),
+                       destination: row[destination]?.asAccountAddress(),
+                       balance: row[balance]?.asAmount(),
+                       representative: row[representative]?.asAccountAddress(),
+                       account: row[account]?.asAccountAddress(),
+                       signature: row[signature]?.asSignature(),
+                       work: row[work]?.asWork(),
+                       pending: row[self.pending])
+        }
+        
+        public func getBlock(hash: Block.Hash,
+                             connection: SQLite.Connection) throws -> Block?
+        {
+            guard let row = try getRow(hash: hash, pending: false, connection: connection) else {
+                return nil
             }
+            return row.toBlock()
         }
     }
     
@@ -258,14 +337,11 @@ public enum DB {
     public static let accounts: AccountsTable = .init()
     
     public static func migrateLedgerDB(connection: SQLite.Connection) throws {
-        try connection.transaction {
-            let version = try info.getVersion(connection: connection)
-            if version == nil {
-                try connection.run(info.table.insert(info.version <- 1))
-                try blocks.create(connection: connection)
-                try accounts.create(connection: connection)
-            }
+        let version = try info.getVersion(connection: connection)
+        if version == nil {
+            try connection.run(info.table.insert(info.version <- 1))
+            try blocks.create(connection: connection)
+            try accounts.create(connection: connection)
         }
-        
     }
 }

@@ -60,6 +60,12 @@ public func ==(a: Work, b: Work) -> Bool {
     return a.value == b.value
 }
 
+extension Work : Comparable {}
+
+public func <(a: Work, b: Work) -> Bool {
+    return a.value < b.value
+}
+
 extension Work {
     public func score(for hash: Block.Hash) -> UInt64 {
         let blake = Blake2B.init(outputSize: 8)
@@ -80,4 +86,26 @@ extension Work {
     public static func generateRandom() -> Work {
         return Work(Random.getUInt64())
     }
+}
+
+public func ==(a: Work?, b: Work?) -> Bool {
+    switch (a, b) {
+    case (.some(let aw), .some(let bw)): return aw == bw
+    case (.some, .none): return false
+    case (.none, .some): return false
+    case (.none, .none): return true
+    }
+}
+
+public func <(a: Work?, b: Work?) -> Bool {
+    switch (a, b) {
+    case (.some(let aw), .some(let bw)): return aw < bw
+    case (.some, .none): return false
+    case (.none, .some): return true
+    case (.none, .none): return false
+    }
+}
+
+public func <=(a: Work?, b: Work?) -> Bool {
+    return !(b < a)
 }

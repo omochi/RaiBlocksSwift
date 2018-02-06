@@ -2,21 +2,32 @@ import Foundation
 import SQLite
 
 public class Storage {
-    public init(dataDir: FilePath) throws {
-        self.dataDir = dataDir
+    public init(environment: Environment) throws {
+        self.dataDir = environment.dataDir
         self.ledgerDBPath = dataDir + "ledger.db"
         self.walletDBPath = dataDir + "wallet.db"
 
         self.ledgerDBConnection = try SQLite.Connection(ledgerDBPath.description)
-        try DB.migrateLedgerDB(connection: ledgerDBConnection)
-        
         self.walletDBConnection = try SQLite.Connection(walletDBPath.description)
+        
+        try self.ledgerDBTransaction { conn in
+            try DB.migrateLedgerDB(connection: conn)
+        }
     }
     
-    public let dataDir: FilePath
+    public func ledgerDBTransaction<R>(_ body: (SQLite.Connection) throws -> R) throws -> R {
+        var ret: R?
+        let conn = ledgerDBConnection
+        try conn.transaction {
+            ret = try body(conn)
+        }
+        return ret!
+    }
     
-    public let ledgerDBPath: FilePath
-    public let walletDBPath: FilePath
+    private let dataDir: FilePath
+    
+    private let ledgerDBPath: FilePath
+    private let walletDBPath: FilePath
 
     private let ledgerDBConnection: SQLite.Connection
     private let walletDBConnection: SQLite.Connection

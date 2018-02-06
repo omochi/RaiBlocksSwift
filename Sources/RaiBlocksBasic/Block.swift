@@ -50,9 +50,9 @@ public enum Block {
     }
     
     public struct Send : BlockProtocol {
-        public let previous: Block.Hash
-        public let destination: Account.Address
-        public let balance: Amount
+        public var previous: Block.Hash
+        public var destination: Account.Address
+        public var balance: Amount
         public var signature: Signature?
         public var work: Work?
         
@@ -104,8 +104,8 @@ public enum Block {
     }
     
     public struct Receive : BlockProtocol {
-        public let previous: Block.Hash
-        public let source: Block.Hash
+        public var previous: Block.Hash
+        public var source: Block.Hash
         public var signature: Signature?
         public var work: Work?
         
@@ -151,8 +151,8 @@ public enum Block {
     }
     
     public struct Open : BlockProtocol {
-        public let source: Block.Hash
-        public let representative: Account.Address
+        public var source: Block.Hash
+        public var representative: Account.Address
         public var account: Account.Address
         public var signature: Signature?
         public var work: Work?
@@ -205,8 +205,8 @@ public enum Block {
     }
     
     public struct Change : BlockProtocol {
-        public let previous: Block.Hash
-        public let representative: Account.Address
+        public var previous: Block.Hash
+        public var representative: Account.Address
         public var signature: Signature?
         public var work: Work?
         
@@ -257,13 +257,31 @@ public enum Block {
     case change(Change)
 }
 
-extension Block {
+extension Block {    
     public var kind: Block.Kind {
         switch self {
         case .send: return .send
         case .receive: return .receive
         case .open: return .open
         case .change: return .change
+        }
+    }
+    
+    public var hash: Block.Hash {
+        switch self {
+        case .send(let b): return b.hash
+        case .receive(let b): return b.hash
+        case .open(let b): return b.hash
+        case .change(let b): return b.hash
+        }
+    }
+    
+    public var work: Work? {
+        switch self {
+        case .send(let b): return b.work
+        case .receive(let b): return b.work
+        case .open(let b): return b.work
+        case .change(let b): return b.work
         }
     }
 }
