@@ -28,9 +28,13 @@ public class Network : CustomStringConvertible {
         return "\(name)"
     }
     
-    public static let main = Network(name: "main",
-                                     magicNumber: UInt16(Unicode.Scalar("R")!.value) << 8 |
-                                        UInt16(Unicode.Scalar("C")!.value),
-                                     peerPort: 7075,
-                                     initialPeerHostnames: ["rai.raiblocks.net"])
+    public static let main: Network = {
+        let magicNumber = UInt16(Unicode.Scalar("R")!.value) << 8 |
+            UInt16(Unicode.Scalar("C")!.value)
+        
+        return Network(name: "main",
+                       magicNumber: magicNumber,
+                       peerPort: 7075,
+                       initialPeerHostnames: ["rai.raiblocks.net"])
+    }()
 }
