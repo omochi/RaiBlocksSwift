@@ -11,4 +11,5 @@ test:
 
 xcode:
 	swift package generate-xcodeproj
-
+	cd Script; \
+		swift run fix-xcodeproj
