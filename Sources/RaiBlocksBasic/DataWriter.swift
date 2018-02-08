@@ -53,6 +53,12 @@ public class DataWriter {
     }
     
     public private(set) var data: Data
+    
+    public static func write(_ value: UInt64, byteOrder: ByteOrder) -> Data {
+        let writer = DataWriter()
+        writer.write(value, byteOrder: byteOrder)
+        return writer.data
+    }
 }
 
 public protocol DataWritable {

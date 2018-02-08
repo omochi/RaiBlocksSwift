@@ -16,10 +16,8 @@ extension Account.Address {
 extension Account.Address {
     public var checkValue: UInt64 {
         var data = Blake2B.compute(data: asData(), outputSize: 5)
-        data.append(contentsOf: [0, 0, 0])
-        return data.withUnsafeBytes { (p: UnsafePointer<UInt64>) in
-            return p.pointee
-        }
+        data += [0, 0, 0]
+        return try! DataReader.read(UInt64.self, from: data, byteOrder: .little)
     }
 }
 

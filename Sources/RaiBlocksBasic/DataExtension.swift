@@ -52,3 +52,9 @@ extension Data {
         return SQLite.Blob(data: self)
     }
 }
+
+extension Data {
+    public func reversedData() -> Data {
+        return Data(self.reversed())
+    }
+}

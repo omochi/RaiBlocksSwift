@@ -19,17 +19,17 @@ public class Storage {
         }
     }
     
+    public let fileSystem: FileSystem
+    public let network: Network
+    
     public func ledgerDBTransaction<R>(_ body: (SQLite.Connection) throws -> R) throws -> R {
         var ret: R?
         let connection = ledgerDBConnection
-        try connection.transaction {
+        try connection.transaction(Connection.TransactionMode.exclusive) {            
             ret = try body(connection)
         }
         return ret!
     }
-    
-    private let fileSystem: FileSystem
-    private let network: Network
     
     private let ledgerDBPath: FilePath
     private let walletDBPath: FilePath

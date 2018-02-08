@@ -3,15 +3,22 @@ import SQLite
 
 public class Ledger {
     public init(queue: DispatchQueue,
-                logger: Logger,
-                storage: Storage)
+                loggerConfig: Logger.Config,
+                network: Network,
+                storage: Storage) throws
     {
+        precondition(storage.network === network)
+        
         self.queue = queue
-        self.logger = Logger(config: logger.config, tag: "Ledger")
+        self.logger = Logger(config: loggerConfig, tag: "Ledger")
+        self.network = network
         self.storage = storage
         self.recoveryInterval = 10
         self.blockQueueSize = 1000
         self.blockQueue = []
+        self.running = false
+        
+        try mayRegisterGenesis()
     }
     
     public func terminate() {
@@ -28,14 +35,28 @@ public class Ledger {
     }
     
     public func push(block: Block) {
-        queue.async {
-            if self.blockQueue.count == self.blockQueueSize {
-                self.logger.warn("block queue is full. discard: \(block.hash)")
+        queue.sync {
+            if blockQueue.count == blockQueueSize {
+                logger.warn("block queue is full. discard: \(block.hash)")
                 return
             }
             
-            self.blockQueue.append(block)
-            self.run()
+            blockQueue.append(block)
+            scheduleRun()
+        }
+    }
+    
+    private func mayRegisterGenesis() throws {
+        try storage.ledgerDBTransaction { connection in
+            let genesis = network.genesis
+            
+            if try DB.blocks.getBlock(hash: genesis.block.hash, connection: connection) == nil {
+                try DB.blocks.put(block: .open(genesis.block), connection: connection)
+            }
+            
+            if try DB.accounts.getAccount(address: genesis.account.address, connection: connection) == nil {
+                try DB.accounts.put(account: genesis.account, connection: connection)
+            }
         }
     }
     
@@ -44,9 +65,25 @@ public class Ledger {
         case alreadyHave
         case needPrevious
     }
+
+    private func scheduleRun() {
+        queue.async {
+            if self.running {
+                return
+            }
+            
+            self.running = true
+            self.run()
+        }
+    }
     
     private func run() {
-        while let block = blockQueue.first {
+        assert(running)
+        
+        recoveryTimer?.cancel()
+        recoveryTimer = nil
+        
+        if let block = blockQueue.first {
             blockQueue.remove(at: 0)
             
             do {
@@ -59,12 +96,21 @@ public class Ledger {
                 blockQueue.insert(block, at: 0)
                 
                 recoveryTimer = makeTimer(delay: recoveryInterval, queue: queue) {
-                    self.run()
+                    self.scheduleRun()
                 }
-
-                break
+                
+                running = false
+                return
             }
+            
+            queue.async {
+                self.run()
+            }
+            
+            return
         }
+        
+        running = false
     }
     
     private func process(block: Block,
@@ -99,9 +145,11 @@ public class Ledger {
     
     private let queue: DispatchQueue
     private let logger: Logger
+    private let network: Network
     private let storage: Storage
     private let recoveryInterval: TimeInterval
     private let blockQueueSize: Int
     private var blockQueue: [Block]
     private var recoveryTimer: DispatchSourceTimer?
+    private var running: Bool
 }

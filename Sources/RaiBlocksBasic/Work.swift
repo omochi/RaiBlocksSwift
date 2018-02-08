@@ -11,9 +11,7 @@ public struct Work {
     }
     
     public static let zero: Work = .init(0)
-    
-    public static let scoreThreshold: UInt64 = 0xFFFFFFC000000000
-        
+            
     private let _value: UInt64
 }
 
@@ -25,11 +23,7 @@ extension Work : CustomStringConvertible {
 
 extension Work : DataConvertible {
     public func asData() -> Data {
-        var data = Data.init(count: 8)
-        data.withUnsafeMutableBytes { (p: UnsafeMutablePointer<UInt64>) in
-            p.pointee = value.convert(to: .little)
-        }
-        return data
+        return DataWriter.write(value, byteOrder: .little)
     }
 }
 
@@ -42,10 +36,7 @@ extension Work : DataWritable {
 extension Work : DataReadable {
     public init(data: Data) {
         precondition(data.count == 8)
-        let value = data.withUnsafeBytes { (p: UnsafePointer<UInt64>) in
-            p.pointee
-        }
-        self.init(value.convert(from: .little))
+        self.init(try! DataReader.read(UInt64.self, from: data, byteOrder: .little))
     }
     
     public init(from reader: DataReader) throws {
@@ -68,17 +59,19 @@ public func <(a: Work, b: Work) -> Bool {
 
 extension Work {
     public func score(for hash: Block.Hash) -> UInt64 {
-        let blake = Blake2B.init(outputSize: 8)
-        blake.update(data: self.asData())
-        blake.update(data: hash.asData())
-        let data = blake.finalize()
-        return data.withUnsafeBytes { (p: UnsafePointer<UInt64>) in
-            return p.pointee
-        }
+        return score(for: hash.asData())
     }
     
-    public func verify(for hash: Block.Hash, threshold: UInt64) -> Bool {
-        return score(for: hash) >= threshold
+    public func score(for address: Account.Address) -> UInt64 {
+        return score(for: address.asData())
+    }
+    
+    public func score(for data: Data) -> UInt64 {
+        let blake = Blake2B.init(outputSize: 8)
+        blake.update(data: self.asData())
+        blake.update(data: data)
+        let data = blake.finalize()
+        return try! DataReader.read(UInt64.self, from: data, byteOrder: .little)
     }
 }
 

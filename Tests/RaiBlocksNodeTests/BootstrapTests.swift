@@ -5,10 +5,11 @@ import RaiBlocksNode
 
 class BootstrapTests: XCTestCase {
     
-    func test1() throws {
+    func _test1() throws {
         let exp = self.expectation(description: "")
         
-        let client = BootstrapClient.init(messageWriter: MessageWriter(),
+        let client = BootstrapClient.init(network: Network.main,
+                                          messageWriter: MessageWriter(),
                                           callbackQueue: .main)
         
         func errorHandler(error: Error) {

@@ -64,6 +64,10 @@ public class DataReader {
     
     public let data: Data
     public var position: Int
+    
+    public static func read(_ type: UInt64.Type, from data: Data, byteOrder: ByteOrder) throws -> UInt64 {
+        return try DataReader(data: data).read(UInt64.self, from: byteOrder)
+    }
 }
 
 public protocol DataReadable {

@@ -86,7 +86,7 @@ public class WorkFinder {
                         }
                     }
                     
-                    print(String(format: "bestScore: %016llx", result.score))
+//                    print(String(format: "bestScore: %016llx", result.score))
                     task.result = result
                 }
                 group.leave()

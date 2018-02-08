@@ -54,3 +54,14 @@ public class Account : CustomStringConvertible {
         return "Account(\(fields.joined(separator: ", "))"
     }
 }
+
+extension Account {
+    public convenience init(openBlock: Block.Open) {
+        fatalError("TODO")
+//        self.init(address: openBlock.account,
+//                  headBlock: openBlock.hash,
+//                  amount: openBlock.source,
+//                  representativeBlock: openBlock.representative,
+//                  blockCount: 1)
+    }
+}
