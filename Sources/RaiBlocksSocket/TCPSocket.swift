@@ -224,9 +224,9 @@ public class TCPSocket {
                 precondition(self.socket == nil)
                 
                 let socket = try initSocket {
-                    try RawDispatchSocket(protocolFamily: protocolFamily,
-                                          type: SOCK_STREAM,
-                                          queue: queue)
+                    try RawDispatchSocket(queue: queue,
+                                          protocolFamily: protocolFamily,
+                                          type: SOCK_STREAM)
                 }
                 
                 try socket.setSockOpt(level: SOL_SOCKET, name: SO_REUSEADDR, value: 1)
@@ -269,6 +269,7 @@ public class TCPSocket {
             precondition(self.socket == nil)
             
             let socket = try socketFactory()
+            precondition(socket.queue == self.queue)
             self.socket = socket
 
             socket.setReadHandler {
@@ -300,9 +301,9 @@ public class TCPSocket {
                               successHandler: @escaping () -> Void,
                               errorHandler: @escaping (Error) -> Void) throws {
             let socket = try initSocket {
-                try RawDispatchSocket(protocolFamily: endPoint.protocolFamily,
-                                      type: SOCK_STREAM,
-                                      queue: queue)
+                try RawDispatchSocket(queue: queue,
+                                      protocolFamily: endPoint.protocolFamily,
+                                      type: SOCK_STREAM)
             }
             assert(socket.writeSuspended)
             
@@ -462,9 +463,11 @@ public class TCPSocket {
             func body() throws {
                 let socket = self.socket!
                 
+                let newSocketImpl = try Impl.init(callbackQueue: callbackQueue)
+                
                 let (rawSocket, endPoint): (RawDispatchSocket, EndPoint)
                 do {
-                    (rawSocket, endPoint) = try socket.accept(queue: self.queue)
+                    (rawSocket, endPoint) = try socket.accept(queue: newSocketImpl.queue)
                 } catch let e as PosixError {
                     if e.errno == EWOULDBLOCK {
                         return
@@ -472,7 +475,6 @@ public class TCPSocket {
                     throw e
                 }
 
-                let newSocketImpl = try Impl.init(callbackQueue: callbackQueue)
                 let _ = newSocketImpl.initSocket { rawSocket }
                 newSocketImpl._endPoint = endPoint
                 newSocketImpl._state = .connected

@@ -87,7 +87,7 @@ public class UDPSocket {
                 precondition(_state == .inited)
                 
                 let _ = try initSocket {
-                    try RawDispatchSocket(protocolFamily: protocolFamily, type: SOCK_DGRAM, queue: queue)
+                    try RawDispatchSocket(queue: queue, protocolFamily: protocolFamily, type: SOCK_DGRAM)
                 }
                 
                 _state = .opened
@@ -147,6 +147,7 @@ public class UDPSocket {
             precondition(self.socket == nil)
             
             let socket = try socketFactory()
+            precondition(socket.queue == self.queue)
             self.socket = socket
             
             socket.setReadHandler {

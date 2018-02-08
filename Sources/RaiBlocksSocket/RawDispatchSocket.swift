@@ -2,13 +2,13 @@ import Foundation
 import RaiBlocksPosix
 
 public class RawDispatchSocket {
-    public init(fd: Int32,
-                protocolFamily: ProtocolFamily,
-                queue: DispatchQueue) throws
+    public init(queue: DispatchQueue,
+                fd: Int32,
+                protocolFamily: ProtocolFamily) throws
     {
+        self.queue = queue
         self.fd = fd
         self.protocolFamily = protocolFamily
-        self.queue = queue
         
         let st = Darwin.fcntl(fd, F_SETFL, O_NONBLOCK)
         if st == -1 {
@@ -22,19 +22,20 @@ public class RawDispatchSocket {
         self.writeSuspended = true
     }
     
-    public convenience init(protocolFamily: ProtocolFamily,
-                            type: Int32,
-                            queue: DispatchQueue) throws
+    public convenience init(queue: DispatchQueue,
+                            protocolFamily: ProtocolFamily,
+                            type: Int32) throws
     {
         let fd = Darwin.socket(protocolFamily.value, type, 0)
         if fd == -1 {
             throw PosixError.init(errno: errno, message: "socket()")
         }
-        try self.init(fd: fd,
-                      protocolFamily: protocolFamily,
-                      queue: queue)
+        try self.init(queue: queue,
+                      fd: fd,
+                      protocolFamily: protocolFamily)
     }
 
+    public let queue: DispatchQueue
     public let fd: Int32
     public let protocolFamily: ProtocolFamily
     public private(set) var readSuspended: Bool
@@ -139,9 +140,9 @@ public class RawDispatchSocket {
             assert(tempSize == UInt32(size))
             return st
         }
-        let socket = try RawDispatchSocket(fd: st,
-                                           protocolFamily: protocolFamily,
-                                           queue: queue)
+        let socket = try RawDispatchSocket(queue: queue,
+                                           fd: st,
+                                           protocolFamily: protocolFamily)
         return (socket, endPoint)
     }
     
@@ -208,8 +209,7 @@ public class RawDispatchSocket {
     public func setWriteHandler(_ handler: @escaping () -> Void) {
         writeSource.setEventHandler(handler: handler)
     }
-    
-    private let queue: DispatchQueue
+
     private let readSource: DispatchSourceRead
     private let writeSource: DispatchSourceWrite
 }
