@@ -144,7 +144,7 @@ public class TCPSocket {
                         throw SocketError.init(message: "name resolve failed, no entry: hostname=\(hostname)")
                     }
                     endPoint.port = port
-                    //                        print("connect: \(endPoint)")
+                                            print("connect: \(endPoint)")
                     try self._connect(endPoint: endPoint,
                                       successHandler: task.successHandler,
                                       errorHandler: task.errorHandler)

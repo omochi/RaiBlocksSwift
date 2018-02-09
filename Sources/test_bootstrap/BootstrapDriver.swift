@@ -6,7 +6,6 @@ public class BootstrapDriver {
     public init(queue: DispatchQueue,
                 network: Network,
                 hostname: String,
-                port: Int,
                 errorHandler: @escaping (Error) -> Void)
     {
         self.queue = queue
@@ -15,10 +14,13 @@ public class BootstrapDriver {
                                       network: network,
                                       messageWriter: writer)
         self.hostname = hostname
-        self.port = port
         self.errorHandler = errorHandler
         self.terminated = false
         start()
+    }
+    
+    deinit {
+        print("deinit")
     }
     
     public func terminate() {
@@ -32,33 +34,39 @@ public class BootstrapDriver {
             
             client.connect(protocolFamily: .ipv4,
                            hostname: hostname,
-                           port: port,
-                           successHandler: { proc1() },
-                           errorHandler: { self.handleError($0) }
+                           port: network.peerPort,
+                           successHandler: { proc2() },
+                           errorHandler: { self.doError($0) }
             )
         }
         
         func proc2() {
             if terminated { return }
             
+            print("proc2")
             
-            
+            client.requestAccount(entryHandler: { (entry, next) in
+                print(entry)
+                proc3()
+            },
+                                  errorHandler: { self.doError($0) })
+        }
+        
+        func proc3() {
+            terminate()
         }
         
         proc1()
     }
     
-    private func handleError(_ error: Error) {
-        if terminated {
-            return
-        }
+    private func doError(_ error: Error) {
+        if terminated { return }
         errorHandler(error)
     }
     
     private let queue: DispatchQueue
     private let client: BootstrapClient
     private let hostname: String
-    private let port: Int
     private let errorHandler: (Error) -> Void
     private var terminated: Bool
 }
