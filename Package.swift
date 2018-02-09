@@ -8,8 +8,10 @@ let package = Package(
     products: [
         .library(name: "RaiBlocksSwift",
                  targets: ["RaiBlocksBasic", "RaiBlocksNode"]),
-        .executable(name: "rbs_node",
-                    targets: ["rbs_node"])
+        .executable(name: "rbsw_node",
+                    targets: ["rbsw_node"]),
+        .executable(name: "test_bootstrap",
+                    targets: ["test_bootstrap"])
         ],
     dependencies: [
         .package(url: "https://github.com/attaswift/BigInt.git", from: "3.0.2"),
@@ -27,7 +29,9 @@ let package = Package(
         .target(name: "RaiBlocksBasic",
                 dependencies: ["RaiBlocksCRandom", "RaiBlocksSocket", "BLAKE2", "ED25519Donna", "BigInt", "SQLite"]),
         .target(name: "RaiBlocksNode", dependencies: ["RaiBlocksBasic"]),
-        .target(name: "rbs_node",
+        .target(name: "rbsw_node",
+                dependencies: ["RaiBlocksBasic", "RaiBlocksNode"]),
+        .target(name: "test_bootstrap",
                 dependencies: ["RaiBlocksBasic", "RaiBlocksNode"]),
         .testTarget(name: "RaiBlocksSocketTests", dependencies: ["RaiBlocksSocket"]),
         .testTarget(name: "RaiBlocksBasicTests", dependencies: ["RaiBlocksBasic"]),
