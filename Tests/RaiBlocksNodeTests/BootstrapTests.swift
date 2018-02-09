@@ -8,16 +8,17 @@ class BootstrapTests: XCTestCase {
     func _test1() throws {
         let exp = self.expectation(description: "")
         
-        let client = BootstrapClient.init(network: Network.main,
-                                          messageWriter: MessageWriter(),
-                                          callbackQueue: .main)
+        let client = BootstrapClient.init(queue: .main,
+                                          network: Network.main,
+                                          messageWriter: MessageWriter())
         
         func errorHandler(error: Error) {
             XCTFail(String(describing: error))
             exp.fulfill()
         }
         
-        client.connect(hostname: "rai.raiblocks.net",
+        client.connect(protocolFamily: .ipv4,
+                       hostname: "rai.raiblocks.net",
                        port: 7075,
                        successHandler: { connectHandler() },
                        errorHandler: errorHandler)

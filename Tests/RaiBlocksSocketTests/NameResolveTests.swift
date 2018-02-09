@@ -12,9 +12,9 @@ class NameResolveTests: XCTestCase {
 
     func testNameResolve1() {
         let exp = self.expectation(description: "")
-        let task = nameResolve(protocolFamily: .ipv4,
+        let task = nameResolve(queue: .main,
+                               protocolFamily: .ipv4,
                                hostname: "raiblocks.net",
-                               callbackQueue: .main,
                                successHandler: { (addresses) in
                                 XCTAssertTrue(addresses.contains { address in
                                     switch address {
@@ -45,9 +45,9 @@ class NameResolveTests: XCTestCase {
     
     func testNameResolveCancel1() {
         let exp = self.expectation(description: "")
-        let task = nameResolve(protocolFamily: .ipv4,
+        let task = nameResolve(queue: .main,
+                               protocolFamily: .ipv4,
                                hostname: "raiblocks.net",
-                               callbackQueue: .main,
                                successHandler: { (addresses) in
                                 XCTFail()
         },
@@ -63,9 +63,9 @@ class NameResolveTests: XCTestCase {
     
     func testNameResolve2() {
         let exp = self.expectation(description: "")
-        let task = nameResolve(protocolFamily: .ipv4,
+        let task = nameResolve(queue: .main,
+                               protocolFamily: .ipv4,
                                hostname: "117.104.133.164",
-                               callbackQueue: .main,
                                successHandler: { (addresses) in
                                 XCTAssertTrue(addresses.contains { address in
                                     switch address {

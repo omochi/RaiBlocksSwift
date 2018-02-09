@@ -23,11 +23,10 @@ public class WorkFinder {
         public var score: UInt64
     }
     
-    public init(callbackQueue: DispatchQueue,
+    public init(queue: DispatchQueue,
                 workerNum: Int? = nil)
     {
-        queue = DispatchQueue.init(label: "WorkFinder.queue")
-        self.callbackQueue = callbackQueue
+        self.queue = queue
         terminated = false
         
         self.workerNum = workerNum ?? ProcessInfo().activeProcessorCount
@@ -36,11 +35,9 @@ public class WorkFinder {
     }
     
     public func terminate() {
-        queue.sync {
-            currentTask = nil
-            pendingTasks.removeAll()
-            terminated = true
-        }
+        currentTask = nil
+        pendingTasks.removeAll()
+        terminated = true
     }
     
     public func find(hash: Block.Hash,
@@ -50,14 +47,12 @@ public class WorkFinder {
         let task = Task.init(hash: hash,
                              threshold: threshold,
                              completeHandler: completeHandler)
-        queue.async {
-            if self.currentTask != nil {
-                self.pendingTasks.append(task)
-                return
-            }
-            
-            self.startTask(task)
+        if currentTask != nil {
+            pendingTasks.append(task)
+            return
         }
+        
+        startTask(task)
     }
     
     private func startTask(_ task: Task) {
@@ -109,15 +104,10 @@ public class WorkFinder {
 
         currentTask = nil
         
-        callbackQueue.async {
-            let terminated = self.queue.sync { self.terminated }
-            if terminated {
-                return
-            }
-            
+        if !terminated {
             task.completeHandler(task.result!.work)
         }
-        
+                
         if pendingTasks.count == 0 {
             return
         }
@@ -147,7 +137,6 @@ public class WorkFinder {
     }
     
     private let queue: DispatchQueue
-    private let callbackQueue: DispatchQueue
     private let workerNum: Int
     private var terminated: Bool
     

@@ -8,8 +8,8 @@ public class UDPSocket {
         case closed
     }
     
-    public convenience init(callbackQueue: DispatchQueue) {
-        let impl = Impl.init(callbackQueue: callbackQueue)
+    public convenience init(queue: DispatchQueue) {
+        let impl = Impl.init(queue: queue)
         self.init(impl: impl)
     }
     
@@ -56,42 +56,36 @@ public class UDPSocket {
     }
     
     private class Impl {
-        public init(callbackQueue: DispatchQueue) {
-            self.queue = DispatchQueue.init(label: "UDPSocket.Impl.queue")
-            self.callbackQueue = callbackQueue
-            
+        public init(queue: DispatchQueue) {
+            self.queue = queue
             self._state = .inited
         }
         
         public var state: State {
-            return queue.sync { _state }
+            return _state
         }
         
         public var protocolFamily: ProtocolFamily? {
-            return queue.sync { socket?.protocolFamily }
+            return socket?.protocolFamily
         }
         
         public func close() {
-            queue.sync {
-                if _state == .closed {
-                    return
-                }
-                
-                _close()
-                _state = .closed
+            if _state == .closed {
+                return
             }
+            
+            _close()
+            _state = .closed
         }
         
         public func open(protocolFamily: ProtocolFamily) throws {
-            try queue.sync {
-                precondition(_state == .inited)
-                
-                let _ = try initSocket {
-                    try RawDispatchSocket(queue: queue, protocolFamily: protocolFamily, type: SOCK_DGRAM)
-                }
-                
-                _state = .opened
+            precondition(_state == .inited)
+            
+            let _ = try initSocket {
+                try RawDispatchSocket(queue: queue, protocolFamily: protocolFamily, type: SOCK_DGRAM)
             }
+            
+            _state = .opened
         }
         
         public func send(data: Data,
@@ -99,47 +93,41 @@ public class UDPSocket {
                          successHandler: @escaping (Int) -> Void,
                          errorHandler: @escaping (Error) -> Void)
         {
-            queue.sync {
-                precondition(_state == .opened)
-                precondition(sendTask == nil)
-                
-                let socket = self.socket!
-                precondition(socket.writeSuspended)
-                
-                socket.resumeWrite()
-                
-                let task = SendTask.init(data: data,
-                                         endPoint: endPoint,
-                                         successHandler: successHandler,
-                                         errorHandler: errorHandler)
-                sendTask = task
-            }
+            precondition(_state == .opened)
+            precondition(sendTask == nil)
+            
+            let socket = self.socket!
+            precondition(socket.writeSuspended)
+            
+            socket.resumeWrite()
+            
+            let task = SendTask.init(data: data,
+                                     endPoint: endPoint,
+                                     successHandler: successHandler,
+                                     errorHandler: errorHandler)
+            sendTask = task
         }
         
         public func receive(size: Int,
                             successHandler: @escaping (Data, EndPoint) -> Void,
                             errorHandler: @escaping (Error) -> Void)
         {
-            queue.sync {
-                precondition(_state == .opened)
-                precondition(receiveTask == nil)
-                
-                let socket = self.socket!
-                precondition(socket.readSuspended)
-                
-                socket.resumeRead()
-                
-                let task = ReceiveTask.init(size: size,
-                                            successHandler: successHandler,
-                                            errorHandler: errorHandler)
-                receiveTask = task
-            }
+            precondition(_state == .opened)
+            precondition(receiveTask == nil)
+            
+            let socket = self.socket!
+            precondition(socket.readSuspended)
+            
+            socket.resumeRead()
+            
+            let task = ReceiveTask.init(size: size,
+                                        successHandler: successHandler,
+                                        errorHandler: errorHandler)
+            receiveTask = task
         }
         
         public func getLocalEndPoint() throws -> EndPoint {
-            return try queue.sync {
-                try socket!.getSockName()
-            }
+            return try socket!.getSockName()
         }
         
         private func initSocket(_ socketFactory: () throws -> RawDispatchSocket) rethrows -> RawDispatchSocket {
@@ -198,7 +186,7 @@ public class UDPSocket {
                 sendTask = nil
                 socket.suspendWrite()
                 postCallback {
-                    return { task.successHandler(sentSize) }
+                    task.successHandler(sentSize)
                 }
             }
             
@@ -228,7 +216,7 @@ public class UDPSocket {
                 receiveTask = nil
                 socket.suspendRead()
                 postCallback {
-                    return { task.successHandler(chunk, endPoint) }
+                    task.successHandler(chunk, endPoint)
                 }
             }
             
@@ -245,24 +233,16 @@ public class UDPSocket {
             _close()
             postCallback {
                 self._state = .closed
-                return { handler(error) }
+                handler(error)
             }
         }
         
-        private func postCallback(_ f: @escaping () -> () -> Void) {
-            callbackQueue.async {
-                let next: () -> Void = self.queue.sync {
-                    if self._state == .closed {
-                        return {}
-                    }
-                    return f()
-                }
-                next()
-            }
+        private func postCallback(_ f: @escaping () -> Void) {
+            if _state == .closed { return }
+            f()
         }
         
         private let queue: DispatchQueue
-        private let callbackQueue: DispatchQueue
         
         private var _state: State
         private var socket: RawDispatchSocket?

@@ -23,10 +23,10 @@ class UDPSocketTests: XCTestCase {
         }
 
         func next1() {
-            socket0 = UDPSocket.init(callbackQueue: .main)
+            socket0 = UDPSocket.init(queue: .main)
             try! socket0.open(protocolFamily: .ipv4)
             
-            socket1 = UDPSocket.init(callbackQueue: .main)
+            socket1 = UDPSocket.init(queue: .main)
             try! socket1.open(protocolFamily: .ipv4)
             
             let msg = "punch\n"

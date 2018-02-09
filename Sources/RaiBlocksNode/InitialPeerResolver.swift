@@ -49,9 +49,9 @@ public class InitialPeerResolver {
         
         let hostname = hostnames[hostnameIndex]
         logger.trace("nameResolve(\(hostname))")
-        task = nameResolve(protocolFamily: .ipv4,
+        task = nameResolve(queue: queue,
+                           protocolFamily: .ipv4,
                            hostname: hostname,
-                           callbackQueue: queue,
                            successHandler: { (endPoints) in
                             self.logger.trace("nameResolve.success: \(endPoints)")
                             self.task?.terminate()

@@ -13,7 +13,7 @@ class WorkFinderTests: XCTestCase {
     func testFinder1() {
         var exps: [XCTestExpectation] = []
         let thresh: UInt64 = 0xFFFF0000_00000000
-        let finder = WorkFinder.init(callbackQueue: DispatchQueue.main)
+        let finder = WorkFinder(queue: .main)
         let hash = Block.Hash(hexString: "D7E659B9C448B241157BECA5DDA1B4F451555AE16149D161013C028DC36800A9")
         
         var count = 0

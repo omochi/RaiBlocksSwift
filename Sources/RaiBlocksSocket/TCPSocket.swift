@@ -11,8 +11,8 @@ public class TCPSocket {
         case closed
     }
     
-    public convenience init(callbackQueue: DispatchQueue) throws {
-        let impl = try Impl.init(callbackQueue: callbackQueue)
+    public convenience init(queue: DispatchQueue) throws {
+        let impl = try Impl.init(queue: queue)
         self.init(impl: impl)
     }
     
@@ -84,35 +84,30 @@ public class TCPSocket {
     }
     
     private class Impl {
-        public init(callbackQueue: DispatchQueue) throws {
-            queue = DispatchQueue.init(label: "TCPSocket.Impl.queue")
+        public init(queue: DispatchQueue) throws {
+            self.queue = queue
             socket = nil
             _endPoint = nil
-            self.callbackQueue = callbackQueue
             _state = .inited
         }
         
         public var state: State {
-            return queue.sync { _state }
+            return _state
         }
         
         public var protocolFamily: ProtocolFamily? {
-            return queue.sync { socket?.protocolFamily }
+            return socket?.protocolFamily
         }
         
         public var endPoint: EndPoint? {
-            return queue.sync { _endPoint }
+            return _endPoint
         }
         
         public func close() {
-            queue.sync {
-                if _state == .closed {
-                    return
-                }
-                
-                _close()
-                _state = .closed
-            }
+            if _state == .closed { return }
+            
+            _close()
+            _state = .closed
         }
         
         public func connect(protocolFamily: ProtocolFamily,
@@ -121,42 +116,40 @@ public class TCPSocket {
                             successHandler: @escaping () -> Void,
                             errorHandler: @escaping (Error) -> Void)
         {
-            queue.sync {
-                precondition(_state == .inited)
-                precondition(connectTask == nil)
+            precondition(_state == .inited)
+            precondition(connectTask == nil)
+            
+            var task: ConnectTask?
+            
+            let nameTask = nameResolve(queue: queue,
+                                       protocolFamily: protocolFamily,
+                                       hostname: hostname,
+                                       successHandler: {
+                                        resolveHandler(endPoints: $0) },
+                                       errorHandler: { error in
+                                        self.doError(error: error,
+                                                     callbackHandler: errorHandler) }
+            )
+            task = ConnectTask.init(nameResolveTask: nameTask,
+                                    successHandler: successHandler,
+                                    errorHandler: errorHandler)
+            self.connectTask = task
+            _state = .connecting
+            
+            func resolveHandler(endPoints: [EndPoint]) {
+                let task = task!
                 
-                var task: ConnectTask?
-                
-                let nameTask = nameResolve(protocolFamily: protocolFamily,
-                                           hostname: hostname,
-                                           callbackQueue: queue,
-                                           successHandler: {
-                                            resolveHandler(endPoints: $0) },
-                                           errorHandler: { error in
-                                            self.doError(error: error,
-                                                         callbackHandler: errorHandler) }
-                )
-                task = ConnectTask.init(nameResolveTask: nameTask,
-                                        successHandler: successHandler,
-                                        errorHandler: errorHandler)
-                self.connectTask = task
-                _state = .connecting
-                
-                func resolveHandler(endPoints: [EndPoint]) {
-                    let task = task!
-                    
-                    do {
-                        guard var endPoint = endPoints.getRandomElement() else {
-                            throw SocketError.init(message: "name resolve failed, no entry: hostname=\(hostname)")
-                        }
-                        endPoint.port = port
-//                        print("connect: \(endPoint)")
-                        try self._connect(endPoint: endPoint,
-                                          successHandler: task.successHandler,
-                                          errorHandler: task.errorHandler)
-                    } catch let error {
-                        self.doError(error: error, callbackHandler: task.errorHandler)
+                do {
+                    guard var endPoint = endPoints.getRandomElement() else {
+                        throw SocketError.init(message: "name resolve failed, no entry: hostname=\(hostname)")
                     }
+                    endPoint.port = port
+                    //                        print("connect: \(endPoint)")
+                    try self._connect(endPoint: endPoint,
+                                      successHandler: task.successHandler,
+                                      errorHandler: task.errorHandler)
+                } catch let error {
+                    self.doError(error: error, callbackHandler: task.errorHandler)
                 }
             }
         }
@@ -165,16 +158,14 @@ public class TCPSocket {
                             successHandler: @escaping () -> Void,
                             errorHandler: @escaping (Error) -> Void)
         {
-            queue.sync {
-                do {
-                    precondition(_state == .inited)
-                    precondition(connectTask == nil)
-                    try _connect(endPoint: endPoint,
-                                 successHandler: successHandler,
-                                 errorHandler: errorHandler)
-                } catch let error {
-                    self.doError(error: error, callbackHandler: errorHandler)
-                }
+            do {
+                precondition(_state == .inited)
+                precondition(connectTask == nil)
+                try _connect(endPoint: endPoint,
+                             successHandler: successHandler,
+                             errorHandler: errorHandler)
+            } catch let error {
+                self.doError(error: error, callbackHandler: errorHandler)
             }
         }
         
@@ -182,40 +173,36 @@ public class TCPSocket {
                          successHandler: @escaping () -> Void,
                          errorHandler: @escaping (Error) -> Void)
         {
-            queue.sync {
-                precondition(_state == .connected)
-                precondition(sendTask == nil)
-                
-                let socket = self.socket!
-                precondition(socket.writeSuspended)
-
-                socket.resumeWrite()
-                
-                let task = SendTask.init(data: data,
-                                         successHandler: successHandler,
-                                         errorHandler: errorHandler)
-                sendTask = task
-            }
+            precondition(_state == .connected)
+            precondition(sendTask == nil)
+            
+            let socket = self.socket!
+            precondition(socket.writeSuspended)
+            
+            socket.resumeWrite()
+            
+            let task = SendTask.init(data: data,
+                                     successHandler: successHandler,
+                                     errorHandler: errorHandler)
+            sendTask = task
         }
         
         public func receive(size: Int?,
                             successHandler: @escaping (Data) -> Void,
                             errorHandler: @escaping (Error) -> Void)
         {
-            queue.sync {
-                precondition(_state == .connected)
-                precondition(receiveTask == nil)
-                
-                let socket = self.socket!
-                precondition(socket.readSuspended)
-                
-                socket.resumeRead()
-                
-                let task = ReceiveTask.init(size: size,
-                                            successHandler: successHandler,
-                                            errorHandler: errorHandler)
-                receiveTask = task
-            }
+            precondition(_state == .connected)
+            precondition(receiveTask == nil)
+            
+            let socket = self.socket!
+            precondition(socket.readSuspended)
+            
+            socket.resumeRead()
+            
+            let task = ReceiveTask.init(size: size,
+                                        successHandler: successHandler,
+                                        errorHandler: errorHandler)
+            receiveTask = task
         }
         
         public func listen(protocolFamily: ProtocolFamily, port: Int, backlog: Int) throws {
@@ -236,32 +223,28 @@ public class TCPSocket {
                 _state = .listening
             }
             
-            try queue.sync {
-                do {
-                    try body()
-                } catch let error {
-                    _close()
-                    _state = .closed
-                    throw error
-                }
+            do {
+                try body()
+            } catch let error {
+                _close()
+                _state = .closed
+                throw error
             }
         }
 
         public func accept(successHandler: @escaping (TCPSocket) -> Void,
                            errorHandler: @escaping (Error) -> Void)
         {
-            queue.sync {
-                precondition(_state == .listening)
-                precondition(acceptTask == nil)
-                
-                let socket = self.socket!
-                precondition(socket.readSuspended)
-                
-                let task = AcceptTask.init(successHandler: successHandler,
-                                           errorHandler: errorHandler)
-                acceptTask = task
-                socket.resumeRead()
-            }
+            precondition(_state == .listening)
+            precondition(acceptTask == nil)
+            
+            let socket = self.socket!
+            precondition(socket.readSuspended)
+            
+            let task = AcceptTask.init(successHandler: successHandler,
+                                       errorHandler: errorHandler)
+            acceptTask = task
+            socket.resumeRead()
         }
         
         private func initSocket(_ socketFactory: () throws -> RawDispatchSocket) rethrows -> RawDispatchSocket {
@@ -345,7 +328,7 @@ public class TCPSocket {
             _endPoint = task.endPoint
             
             postCallback {
-                return { task.successHandler() }
+                task.successHandler()
             }
         }
         
@@ -389,7 +372,7 @@ public class TCPSocket {
                 sendTask = nil
                 socket.suspendWrite()
                 postCallback {
-                    return { task.successHandler() }
+                    task.successHandler()
                 }
             }
             
@@ -446,7 +429,7 @@ public class TCPSocket {
                 receiveTask = nil
                 socket.suspendRead()
                 postCallback {
-                    return { task.successHandler(task.data) }
+                    task.successHandler(task.data)
                 }
             }
             
@@ -463,7 +446,7 @@ public class TCPSocket {
             func body() throws {
                 let socket = self.socket!
                 
-                let newSocketImpl = try Impl.init(callbackQueue: callbackQueue)
+                let newSocketImpl = try Impl.init(queue: queue)
                 
                 let (rawSocket, endPoint): (RawDispatchSocket, EndPoint)
                 do {
@@ -484,7 +467,7 @@ public class TCPSocket {
                 socket.suspendRead()
                 
                 postCallback {
-                    return { task.successHandler(newSocket) }
+                    task.successHandler(newSocket)
                 }
             }
             
@@ -501,26 +484,16 @@ public class TCPSocket {
             _close()
             postCallback {
                 self._state = .closed
-                return {
-                    callbackHandler(error)
-                }
+                callbackHandler(error)
             }
         }
         
-        private func postCallback(_ f: @escaping () -> () -> Void) {
-            callbackQueue.async {
-                let next: () -> Void = self.queue.sync {
-                    if self._state == .closed {
-                        return {}
-                    }
-                    return f()
-                }
-                next()
-            }
+        private func postCallback(_ f: @escaping () -> Void) {
+            if _state == .closed { return }
+            f()
         }
         
         private let queue: DispatchQueue
-        private let callbackQueue: DispatchQueue
         private let connectTimeoutInterval: Double = 10.0
         
         private var _state: State

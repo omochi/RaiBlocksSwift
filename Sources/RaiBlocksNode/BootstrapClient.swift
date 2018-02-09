@@ -27,7 +27,7 @@ public class BootstrapClient {
         do {
             precondition(_socket == nil)
             
-            let socket = try TCPSocket.init(callbackQueue: queue)
+            let socket = try TCPSocket.init(queue: queue)
             self._socket = socket
             socket.connect(protocolFamily: protocolFamily,
                            hostname: hostname,

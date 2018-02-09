@@ -23,7 +23,7 @@ public class NodeImpl {
     }
 
     public func start() throws {
-        let socket = UDPSocket(callbackQueue: queue)
+        let socket = UDPSocket(queue: queue)
         self.socket = socket
         
         try socket.open(protocolFamily: .ipv4)

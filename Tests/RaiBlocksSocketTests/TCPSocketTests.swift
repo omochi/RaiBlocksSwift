@@ -13,7 +13,7 @@ class TCPSocketTests: XCTestCase {
     func testConnect1() throws {
         let exp = self.expectation(description: "")
         
-        let socket = try TCPSocket.init(callbackQueue: .main)
+        let socket = try TCPSocket.init(queue: .main)
         socket.connect(endPoint: .ipv4(IPv4.EndPoint(address: IPv4.Address(string: "117.104.133.164")!,
                                                      port: 80)),
                        successHandler: {
@@ -27,7 +27,7 @@ class TCPSocketTests: XCTestCase {
     
     func testWriteRead1() throws {
         let exp = self.expectation(description: "")
-        let socket: TCPSocket = try TCPSocket.init(callbackQueue: .main)
+        let socket: TCPSocket = try TCPSocket.init(queue: .main)
         var response = Data.init()
 
         socket.connect(endPoint: .ipv4(IPv4.EndPoint(address: IPv4.Address(string: "117.104.133.164")!,
@@ -80,7 +80,7 @@ class TCPSocketTests: XCTestCase {
     
     func testWriteRead2() throws {
         let exp = self.expectation(description: "")
-        let socket: TCPSocket = try TCPSocket.init(callbackQueue: .main)
+        let socket: TCPSocket = try TCPSocket.init(queue: .main)
         var response = Data.init()
         
         socket.connect(protocolFamily: .ipv4,
@@ -138,7 +138,7 @@ class TCPSocketTests: XCTestCase {
         
         var sockets: [TCPSocket] = []
         
-        let listenSocket = try TCPSocket.init(callbackQueue: .main)
+        let listenSocket = try TCPSocket.init(queue: .main)
         try listenSocket.listen(protocolFamily: .ipv4, port: 4567)
         listenSocket.accept(successHandler: { socket in
             sockets.append(socket)
@@ -159,7 +159,7 @@ class TCPSocketTests: XCTestCase {
         
         let exp2 = self.expectation(description: "clientSocket")
         
-        let clientSocket = try TCPSocket.init(callbackQueue: .main)
+        let clientSocket = try TCPSocket.init(queue: .main)
         clientSocket.connect(endPoint: .ipv4(IPv4.EndPoint(address: IPv4.Address(string: "127.0.0.1")!,
                                                            port: 4567)),
                              successHandler: { 
