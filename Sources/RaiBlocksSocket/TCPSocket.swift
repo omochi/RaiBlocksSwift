@@ -211,9 +211,9 @@ public class TCPSocket {
                 precondition(self.socket == nil)
                 
                 let socket = try initSocket {
-                    try RawDispatchSocket(queue: queue,
-                                          protocolFamily: protocolFamily,
-                                          type: SOCK_STREAM)
+                    try RawDispatchSocket(protocolFamily: protocolFamily,
+                                          type: SOCK_STREAM,
+                                          callbackQueue: queue)
                 }
                 
                 try socket.setSockOpt(level: SOL_SOCKET, name: SO_REUSEADDR, value: 1)
@@ -252,7 +252,6 @@ public class TCPSocket {
             precondition(self.socket == nil)
             
             let socket = try socketFactory()
-            precondition(socket.queue == self.queue)
             self.socket = socket
 
             socket.setReadHandler {
@@ -284,9 +283,9 @@ public class TCPSocket {
                               successHandler: @escaping () -> Void,
                               errorHandler: @escaping (Error) -> Void) throws {
             let socket = try initSocket {
-                try RawDispatchSocket(queue: queue,
-                                      protocolFamily: endPoint.protocolFamily,
-                                      type: SOCK_STREAM)
+                try RawDispatchSocket(protocolFamily: endPoint.protocolFamily,
+                                      type: SOCK_STREAM,
+                                      callbackQueue: queue)
             }
             assert(socket.writeSuspended)
             
