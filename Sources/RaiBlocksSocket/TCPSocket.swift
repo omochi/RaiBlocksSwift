@@ -179,12 +179,13 @@ public class TCPSocket {
             let socket = self.socket!
             precondition(socket.writeSuspended)
             
-            socket.resumeWrite()
-            
             let task = SendTask.init(data: data,
                                      successHandler: successHandler,
                                      errorHandler: errorHandler)
             sendTask = task
+            socket.awaitWriteEvent {
+                self.doSend()
+            }
         }
         
         public func receive(size: Int?,
@@ -197,12 +198,13 @@ public class TCPSocket {
             let socket = self.socket!
             precondition(socket.readSuspended)
             
-            socket.resumeRead()
-            
             let task = ReceiveTask.init(size: size,
                                         successHandler: successHandler,
                                         errorHandler: errorHandler)
             receiveTask = task
+            socket.awaitReadEvent {
+                self.doReceive()
+            }
         }
         
         public func listen(protocolFamily: ProtocolFamily, port: Int, backlog: Int) throws {
@@ -210,12 +212,10 @@ public class TCPSocket {
                 precondition(_state == .inited)
                 precondition(self.socket == nil)
                 
-                let socket = try initSocket {
-                    try RawDispatchSocket(protocolFamily: protocolFamily,
-                                          type: SOCK_STREAM,
-                                          callbackQueue: queue)
-                }
-                
+                let socket = try DispatchSocket(queue: queue,
+                                                protocolFamily: protocolFamily,
+                                                type: SOCK_STREAM)
+                self.initSocket(socket)
                 try socket.setSockOpt(level: SOL_SOCKET, name: SO_REUSEADDR, value: 1)
                 let endPoint: EndPoint = .listening(protocolFamily: protocolFamily, port: port)
                 try socket.bind(endPoint: endPoint)
@@ -244,50 +244,26 @@ public class TCPSocket {
             let task = AcceptTask.init(successHandler: successHandler,
                                        errorHandler: errorHandler)
             acceptTask = task
-            socket.resumeRead()
+            socket.awaitReadEvent {
+                self.doAccept()
+            }
         }
         
-        private func initSocket(_ socketFactory: () throws -> RawDispatchSocket) rethrows -> RawDispatchSocket {
+        private func initSocket(_ socket: DispatchSocket) {
             precondition(_state == .inited || _state == .connecting)
             precondition(self.socket == nil)
-            
-            let socket = try socketFactory()
             self.socket = socket
-
-            socket.setReadHandler {
-                switch self._state {
-                case .connected:
-                    self.doReceive()
-                case .listening:
-                    self.doAccept()
-                default:
-                    return
-                }
-            }
-            
-            socket.setWriteHandler {
-                switch self._state {
-                case .connecting:
-                    self.doConnectSuccess()
-                case .connected:
-                    self.doSend()
-                default:
-                    return
-                }
-            }
-            
-            return socket
         }
 
         private func _connect(endPoint: EndPoint,
                               successHandler: @escaping () -> Void,
                               errorHandler: @escaping (Error) -> Void) throws {
-            let socket = try initSocket {
-                try RawDispatchSocket(protocolFamily: endPoint.protocolFamily,
-                                      type: SOCK_STREAM,
-                                      callbackQueue: queue)
-            }
+            let socket = try DispatchSocket(queue: queue,
+                                            protocolFamily: endPoint.protocolFamily,
+                                            type: SOCK_STREAM)
+            self.initSocket(socket)
             assert(socket.writeSuspended)
+            
             
             do {
                 try socket.connect(endPoint: endPoint)
@@ -296,9 +272,7 @@ public class TCPSocket {
                     throw e
                 }
             }
-            
-            socket.resumeWrite()
-            
+
             let timer = DispatchSource.makeTimerSource(flags: [], queue: queue)
             timer.schedule(deadline: .now() + connectTimeoutInterval)
             timer.setEventHandler {
@@ -312,12 +286,13 @@ public class TCPSocket {
                                         errorHandler: errorHandler)
             connectTask = task
             _state = .connecting
+            socket.awaitWriteEvent {
+                self.doConnectSuccess()
+            }
         }
         
         private func doConnectSuccess() {
             assert(_state == .connecting)
-            
-            socket!.suspendWrite()
             
             let task = connectTask!
             task.close()
@@ -358,6 +333,9 @@ public class TCPSocket {
                     sentSize = try socket.send(data: chunk)
                 } catch let e as PosixError {
                     if e.errno == EAGAIN {
+                        socket.awaitWriteEvent {
+                            self.doSend()
+                        }
                         return
                     }
                     throw e
@@ -369,7 +347,6 @@ public class TCPSocket {
                 }
                 
                 sendTask = nil
-                socket.suspendWrite()
                 postCallback {
                     task.successHandler()
                 }
@@ -378,6 +355,7 @@ public class TCPSocket {
             do {
                 try body()
             } catch let error {
+                sendTask = nil
                 doError(error: error, callbackHandler: task.errorHandler)
             }
         }
@@ -407,6 +385,9 @@ public class TCPSocket {
                     } catch let e as PosixError {
                         if e.errno == EAGAIN {
                             if let _ = task.size {
+                                socket.awaitReadEvent {
+                                    self.doReceive()
+                                }
                                 return
                             } else {
                                 break
@@ -426,7 +407,6 @@ public class TCPSocket {
                 }
                 
                 receiveTask = nil
-                socket.suspendRead()
                 postCallback {
                     task.successHandler(task.data)
                 }
@@ -435,6 +415,7 @@ public class TCPSocket {
             do {
                 try body()
             } catch let error {
+                receiveTask = nil
                 doError(error: error, callbackHandler: task.errorHandler)
             }
         }
@@ -447,23 +428,25 @@ public class TCPSocket {
                 
                 let newSocketImpl = try Impl.init(queue: queue)
                 
-                let (rawSocket, endPoint): (RawDispatchSocket, EndPoint)
+                let (rawSocket, endPoint): (DispatchSocket, EndPoint)
                 do {
                     (rawSocket, endPoint) = try socket.accept(queue: newSocketImpl.queue)
                 } catch let e as PosixError {
                     if e.errno == EWOULDBLOCK {
+                        socket.awaitReadEvent {
+                            self.doAccept()
+                        }
                         return
                     }
                     throw e
                 }
 
-                let _ = newSocketImpl.initSocket { rawSocket }
+                newSocketImpl.initSocket(rawSocket)
                 newSocketImpl._endPoint = endPoint
                 newSocketImpl._state = .connected
                 let newSocket = TCPSocket.init(impl: newSocketImpl)
                 
                 acceptTask = nil
-                socket.suspendRead()
                 
                 postCallback {
                     task.successHandler(newSocket)
@@ -473,6 +456,7 @@ public class TCPSocket {
             do {
                 try body()
             } catch let error {
+                acceptTask = nil
                 doError(error: error, callbackHandler: task.errorHandler)
             }
         }
@@ -496,7 +480,7 @@ public class TCPSocket {
         private let connectTimeoutInterval: Double = 10.0
         
         private var _state: State
-        private var socket: RawDispatchSocket?
+        private var socket: DispatchSocket?
         private var _endPoint: EndPoint?
         private var connectTask: ConnectTask?
         private var sendTask: SendTask?

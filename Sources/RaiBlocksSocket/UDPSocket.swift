@@ -81,12 +81,11 @@ public class UDPSocket {
         public func open(protocolFamily: ProtocolFamily) throws {
             precondition(_state == .inited)
             
-            let _ = try initSocket {
-                try RawDispatchSocket(protocolFamily: protocolFamily,
-                                      type: SOCK_DGRAM,
-                                      callbackQueue: queue)
-            }
-            
+            let socket = try DispatchSocket(queue: queue,
+                                            protocolFamily: protocolFamily,
+                                            type: SOCK_DGRAM)
+            initSocket(socket)
+
             _state = .opened
         }
         
@@ -101,13 +100,14 @@ public class UDPSocket {
             let socket = self.socket!
             precondition(socket.writeSuspended)
             
-            socket.resumeWrite()
-            
             let task = SendTask.init(data: data,
                                      endPoint: endPoint,
                                      successHandler: successHandler,
                                      errorHandler: errorHandler)
             sendTask = task
+            socket.awaitWriteEvent {
+                self.doSend()
+            }
         }
         
         public func receive(size: Int,
@@ -119,45 +119,25 @@ public class UDPSocket {
             
             let socket = self.socket!
             precondition(socket.readSuspended)
-            
-            socket.resumeRead()
-            
+
             let task = ReceiveTask.init(size: size,
                                         successHandler: successHandler,
                                         errorHandler: errorHandler)
             receiveTask = task
+            
+            socket.awaitReadEvent {
+                self.doReceive()
+            }
         }
         
         public func getLocalEndPoint() throws -> EndPoint {
             return try socket!.getSockName()
         }
         
-        private func initSocket(_ socketFactory: () throws -> RawDispatchSocket) rethrows -> RawDispatchSocket {
+        private func initSocket(_ socket: DispatchSocket) {
             precondition(_state == .inited)
             precondition(self.socket == nil)
-            
-            let socket = try socketFactory()
             self.socket = socket
-            
-            socket.setReadHandler {
-                switch self._state {
-                case .opened:
-                    self.doReceive()
-                default:
-                    return
-                }
-            }
-            
-            socket.setWriteHandler {
-                switch self._state {
-                case .opened:
-                    self.doSend()
-                default:
-                    return
-                }
-            }
-            
-            return socket
         }
         
         private func _close() {
@@ -179,13 +159,15 @@ public class UDPSocket {
                     sentSize = try socket.sendTo(data: task.data, endPoint: task.endPoint)
                 } catch let e as PosixError {
                     if e.errno == EAGAIN {
+                        socket.awaitWriteEvent {
+                            self.doSend()
+                        }
                         return
                     }
                     throw e
                 }
                 
                 sendTask = nil
-                socket.suspendWrite()
                 postCallback {
                     task.successHandler(sentSize)
                 }
@@ -194,6 +176,7 @@ public class UDPSocket {
             do {
                 try body()
             } catch let error {
+                sendTask = nil
                 postError(error, handler: task.errorHandler)
             }
         }
@@ -209,13 +192,16 @@ public class UDPSocket {
                     (chunk, endPoint) = try socket.recvFrom(size: task.size)
                 } catch let e as PosixError {
                     if e.errno == EAGAIN {
+                        socket.awaitReadEvent {
+                            self.doReceive()
+                        }
                         return
                     }
+                    
                     throw e
                 }
                 
                 receiveTask = nil
-                socket.suspendRead()
                 postCallback {
                     task.successHandler(chunk, endPoint)
                 }
@@ -224,6 +210,7 @@ public class UDPSocket {
             do {
                 try body()
             } catch let error {
+                receiveTask = nil
                 postError(error, handler: task.errorHandler)
             }
         }
@@ -246,7 +233,7 @@ public class UDPSocket {
         private let queue: DispatchQueue
         
         private var _state: State
-        private var socket: RawDispatchSocket?
+        private var socket: DispatchSocket?
         
         private var sendTask: SendTask?
         private var receiveTask: ReceiveTask?
