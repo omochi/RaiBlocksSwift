@@ -1,3 +1,3 @@
 # RaiBlocksSwift
 
-A description of this package.
+作りかけですが飽きてきて中断しました
